@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { requireAdminApi } from "@/lib/auth";
 import { jsonOk, readJson, toApiError } from "@/lib/api";
+import { autoFillMissingImportCategories } from "@/lib/category-inference";
 import { getOrCreateCategory, getOrCreateLabels, getOrCreateSource, getOrCreateTags } from "@/lib/db-helpers";
 import {
   buildImportPreview,
@@ -33,6 +34,8 @@ const schema = z.object({
       createMissing: z.boolean().optional(),
       updateExisting: z.boolean().optional(),
       mergeTagsLabels: z.boolean().optional(),
+      autoCategorizeMissingCategories: z.boolean().optional(),
+      autoCategorizeCsvMissingCategories: z.boolean().optional(),
     })
     .optional(),
 });
@@ -60,14 +63,20 @@ export async function POST(request: Request) {
     const createMissing = body.options?.createMissing ?? true;
     const updateExisting = body.options?.updateExisting ?? false;
     const mergeTagsLabels = body.options?.mergeTagsLabels ?? true;
-    const rows = parseImportPayload(body);
-    const minecraftProfiles = await lookupMinecraftProfilesForImportRows(rows);
+    const parsedRows = parseImportPayload(body);
     const [existingCandidates, categories, tags, labels] = await Promise.all([
       prisma.candidate.findMany({ select: { id: true, nameNormalized: true, nameOriginal: true } }),
       prisma.category.findMany({ select: { name: true } }),
       prisma.tag.findMany({ select: { name: true } }),
       prisma.label.findMany({ select: { name: true } }),
     ]);
+    const rows = await autoFillMissingImportCategories({
+      rows: parsedRows,
+      defaults: body.defaults,
+      existingCategories: categories.map((item) => item.name),
+      enabled: body.options?.autoCategorizeMissingCategories ?? body.options?.autoCategorizeCsvMissingCategories ?? true,
+    });
+    const minecraftProfiles = await lookupMinecraftProfilesForImportRows(rows);
     const preview = buildImportPreview({
       rows,
       defaults: body.defaults,

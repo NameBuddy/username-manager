@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireAdminApi } from "@/lib/auth";
 import { jsonOk, readJson, toApiError } from "@/lib/api";
+import { autoFillMissingImportCategories } from "@/lib/category-inference";
 import { buildImportPreview, lookupMinecraftProfilesForImportRows, parseImportPayload } from "@/lib/importer";
 import { prisma } from "@/lib/prisma";
 
@@ -19,20 +20,32 @@ const schema = z.object({
       availabilityStatus: z.string().optional(),
     })
     .optional(),
+  options: z
+    .object({
+      autoCategorizeMissingCategories: z.boolean().optional(),
+      autoCategorizeCsvMissingCategories: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 export async function POST(request: Request) {
   try {
     await requireAdminApi();
     const body = schema.parse(await readJson(request));
-    const rows = parseImportPayload(body);
-    const minecraftProfiles = await lookupMinecraftProfilesForImportRows(rows);
+    const parsedRows = parseImportPayload(body);
     const [existingCandidates, categories, tags, labels] = await Promise.all([
       prisma.candidate.findMany({ select: { id: true, nameNormalized: true, nameOriginal: true } }),
       prisma.category.findMany({ select: { name: true } }),
       prisma.tag.findMany({ select: { name: true } }),
       prisma.label.findMany({ select: { name: true } }),
     ]);
+    const rows = await autoFillMissingImportCategories({
+      rows: parsedRows,
+      defaults: body.defaults,
+      existingCategories: categories.map((item) => item.name),
+      enabled: body.options?.autoCategorizeMissingCategories ?? body.options?.autoCategorizeCsvMissingCategories ?? true,
+    });
+    const minecraftProfiles = await lookupMinecraftProfilesForImportRows(rows);
 
     const preview = buildImportPreview({
       rows,

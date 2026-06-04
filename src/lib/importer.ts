@@ -111,8 +111,41 @@ function compactRow(row: ParsedImportRow): ParsedImportRow {
   return compact;
 }
 
-function readMapped(row: Record<string, unknown>, key: keyof NonNullable<ParsePayloadInput["columnMap"]>) {
-  return row[key] ?? row[key.toLowerCase()] ?? row[key.toUpperCase()];
+function normalizeRecord(row: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [key.trim(), typeof value === "string" ? value.trim() : value]),
+  );
+}
+
+function readField(row: Record<string, unknown>, field?: string) {
+  const target = field?.trim().toLowerCase();
+  if (!target) {
+    return undefined;
+  }
+
+  for (const [key, value] of Object.entries(row)) {
+    if (key.trim().toLowerCase() === target) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function readMapped(
+  row: Record<string, unknown>,
+  key: keyof NonNullable<ParsePayloadInput["columnMap"]>,
+  map: ParsePayloadInput["columnMap"] = {},
+) {
+  return readField(row, map[key]) ?? readField(row, key);
+}
+
+function textFrom(value: unknown): string | undefined {
+  if (value == null) {
+    return undefined;
+  }
+  const text = String(value).trim();
+  return text || undefined;
 }
 
 export function parseImportPayload(input: ParsePayloadInput): ParsedImportRow[] {
@@ -125,21 +158,29 @@ export function parseImportPayload(input: ParsePayloadInput): ParsedImportRow[] 
   }
 
   if (input.type === "json") {
-    const parsed = JSON.parse(input.content) as Record<string, unknown>[];
+    const parsed = JSON.parse(input.content) as unknown;
     if (!Array.isArray(parsed)) {
       throw new Error("JSON import must be an array");
     }
+    const map = input.columnMap ?? {};
     return parsed
-      .map((row) => compactRow({
-        name: String(row.name ?? row.username ?? "").trim(),
-        category: typeof row.category === "string" ? row.category : undefined,
-        tags: splitList(row.tags),
-        labels: splitList(row.labels),
-        score: scoreFrom(row.score),
-        source: typeof row.source === "string" ? row.source : undefined,
-        notes: typeof row.notes === "string" ? row.notes : undefined,
-        scoreReason: typeof row.scoreReason === "string" ? row.scoreReason : undefined,
-      }))
+      .map((rawRow) => {
+        if (!rawRow || typeof rawRow !== "object" || Array.isArray(rawRow)) {
+          return compactRow({ name: "" });
+        }
+        const row = normalizeRecord(rawRow as Record<string, unknown>);
+
+        return compactRow({
+          name: String(readMapped(row, "name", map) ?? readField(row, "username") ?? readField(row, "candidate") ?? "").trim(),
+          category: textFrom(readMapped(row, "category", map)),
+          tags: splitList(readMapped(row, "tags", map)),
+          labels: splitList(readMapped(row, "labels", map)),
+          score: scoreFrom(readMapped(row, "score", map)),
+          source: textFrom(readMapped(row, "source", map)),
+          notes: textFrom(readMapped(row, "notes", map)),
+          scoreReason: textFrom(readField(row, "scoreReason") ?? readField(row, "score_reason")),
+        });
+      })
       .filter((row) => row.name);
   }
 
@@ -156,18 +197,16 @@ export function parseImportPayload(input: ParsePayloadInput): ParsedImportRow[] 
   const map = input.columnMap ?? {};
   return result.data
     .map((row) => {
-      const mappedRow = Object.fromEntries(
-        Object.entries(row).map(([key, value]) => [key.trim(), typeof value === "string" ? value.trim() : value]),
-      );
+      const mappedRow = normalizeRecord(row);
 
       return compactRow({
-        name: String(mappedRow[map.name ?? "name"] ?? mappedRow.username ?? mappedRow.candidate ?? "").trim(),
-        category: String(mappedRow[map.category ?? "category"] ?? readMapped(mappedRow, "category") ?? "").trim() || undefined,
-        tags: splitList(mappedRow[map.tags ?? "tags"] ?? readMapped(mappedRow, "tags")),
-        labels: splitList(mappedRow[map.labels ?? "labels"] ?? readMapped(mappedRow, "labels")),
-        score: scoreFrom(mappedRow[map.score ?? "score"] ?? readMapped(mappedRow, "score")),
-        source: String(mappedRow[map.source ?? "source"] ?? readMapped(mappedRow, "source") ?? "").trim() || undefined,
-        notes: String(mappedRow[map.notes ?? "notes"] ?? readMapped(mappedRow, "notes") ?? "").trim() || undefined,
+        name: String(readMapped(mappedRow, "name", map) ?? readField(mappedRow, "username") ?? readField(mappedRow, "candidate") ?? "").trim(),
+        category: textFrom(readMapped(mappedRow, "category", map)),
+        tags: splitList(readMapped(mappedRow, "tags", map)),
+        labels: splitList(readMapped(mappedRow, "labels", map)),
+        score: scoreFrom(readMapped(mappedRow, "score", map)),
+        source: textFrom(readMapped(mappedRow, "source", map)),
+        notes: textFrom(readMapped(mappedRow, "notes", map)),
       });
     })
     .filter((row) => row.name);

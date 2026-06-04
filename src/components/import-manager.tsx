@@ -67,6 +67,8 @@ export function ImportManager() {
   const [categoryColumn, setCategoryColumn] = useState("category");
   const [tagsColumn, setTagsColumn] = useState("tags");
   const [labelsColumn, setLabelsColumn] = useState("labels");
+  const [sourceColumn, setSourceColumn] = useState("source");
+  const [notesColumn, setNotesColumn] = useState("notes");
   const [categories, setCategories] = useState<TaxonomyItem[]>([]);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -75,6 +77,7 @@ export function ImportManager() {
   const [createMissing, setCreateMissing] = useState(true);
   const [updateExisting, setUpdateExisting] = useState(false);
   const [mergeTagsLabels, setMergeTagsLabels] = useState(true);
+  const [autoCategorizeMissingCategories, setAutoCategorizeMissingCategories] = useState(true);
 
   useEffect(() => {
     fetch("/api/categories")
@@ -104,6 +107,8 @@ export function ImportManager() {
         category: categoryColumn,
         tags: tagsColumn,
         labels: labelsColumn,
+        source: sourceColumn,
+        notes: notesColumn,
       },
       defaults: {
         category: category || undefined,
@@ -114,6 +119,7 @@ export function ImportManager() {
         candidateStatus,
         availabilityStatus,
       },
+      options: { autoCategorizeMissingCategories },
     };
   }
 
@@ -143,7 +149,7 @@ export function ImportManager() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...payload(),
-        options: { createMissing, updateExisting, mergeTagsLabels },
+        options: { createMissing, updateExisting, mergeTagsLabels, autoCategorizeMissingCategories },
       }),
     });
     const body = (await response.json().catch(() => null)) as { result?: ImportResult; error?: string } | null;
@@ -187,8 +193,8 @@ export function ImportManager() {
           <h2 className="mb-3 text-lg font-semibold">Default Metadata</h2>
           <div className="grid gap-3">
             <label className="grid gap-1 text-sm font-medium">
-              Category
-              <select className="field" required value={category} onChange={(event) => setCategory(event.target.value)}>
+              Default category
+              <select className="field" value={category} onChange={(event) => setCategory(event.target.value)}>
                 <option value="">Select category</option>
                 {categories.map((item) => (
                   <option key={item.id} value={item.name}>
@@ -226,19 +232,29 @@ export function ImportManager() {
             </label>
           </div>
 
-          {type === "csv" ? (
+          {type !== "txt" ? (
             <div className="mt-5 border-t border-zinc-200 pt-4">
-              <h2 className="mb-3 text-lg font-semibold">CSV Mapping</h2>
+              <h2 className="mb-3 text-lg font-semibold">{type.toUpperCase()} Mapping</h2>
               <div className="grid grid-cols-2 gap-2">
-                <Input label="Name column" value={nameColumn} onChange={setNameColumn} />
-                <Input label="Category column" value={categoryColumn} onChange={setCategoryColumn} />
-                <Input label="Tags column" value={tagsColumn} onChange={setTagsColumn} />
-                <Input label="Labels column" value={labelsColumn} onChange={setLabelsColumn} />
+                <Input label={`Name ${type === "json" ? "field" : "column"}`} value={nameColumn} onChange={setNameColumn} />
+                <Input label={`Category ${type === "json" ? "field" : "column"}`} value={categoryColumn} onChange={setCategoryColumn} />
+                <Input label={`Tags ${type === "json" ? "field" : "column"}`} value={tagsColumn} onChange={setTagsColumn} />
+                <Input label={`Labels ${type === "json" ? "field" : "column"}`} value={labelsColumn} onChange={setLabelsColumn} />
+                <Input label={`Source ${type === "json" ? "field" : "column"}`} value={sourceColumn} onChange={setSourceColumn} />
+                <Input label={`Notes ${type === "json" ? "field" : "column"}`} value={notesColumn} onChange={setNotesColumn} />
               </div>
             </div>
           ) : null}
 
           <div className="mt-5 grid gap-2 border-t border-zinc-200 pt-4 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={autoCategorizeMissingCategories}
+                onChange={(event) => setAutoCategorizeMissingCategories(event.target.checked)}
+              />
+              DeepSeek category fill
+            </label>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={createMissing} onChange={(event) => setCreateMissing(event.target.checked)} />
               Create missing categories, tags, labels
@@ -255,7 +271,7 @@ export function ImportManager() {
 
           {error ? <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
           <div className="mt-5 flex gap-2">
-            <button className="btn btn-secondary flex-1" type="button" disabled={busy || !content.trim() || !category} onClick={() => void runPreview()}>
+            <button className="btn btn-secondary flex-1" type="button" disabled={busy || !content.trim()} onClick={() => void runPreview()}>
               <Play size={16} />
               Preview
             </button>
@@ -289,6 +305,7 @@ export function ImportManager() {
                   <th className="p-3">Row</th>
                   <th className="p-3">Name</th>
                   <th className="p-3">Normalized</th>
+                  <th className="p-3">Category</th>
                   <th className="p-3">Status</th>
                   <th className="p-3">Reason</th>
                   <th className="p-3">Fuzzy matches</th>
@@ -302,6 +319,7 @@ export function ImportManager() {
                     <td className="p-3">{row.rowNumber}</td>
                     <td className="p-3 font-medium">{row.nameOriginal}</td>
                     <td className="p-3">{row.nameNormalized}</td>
+                    <td className="p-3">{row.category ?? "-"}</td>
                     <td className="p-3"><span className="chip">{row.status}</span></td>
                     <td className="p-3">{row.reason ?? "-"}</td>
                     <td className="p-3">{row.fuzzyDuplicateNames.join(", ") || "-"}</td>

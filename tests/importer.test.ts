@@ -37,6 +37,28 @@ describe("parseImportPayload", () => {
       { name: "Madara", tags: ["Naruto"] },
     ]);
   });
+
+  it("uses field mapping for json imports", () => {
+    expect(
+      parseImportPayload({
+        type: "json",
+        content: '[{"username":"Gojo","type":"Anime & Manga","group":["Jujutsu Kaisen"],"origin":"Manual"}]',
+        columnMap: {
+          name: "username",
+          category: "type",
+          tags: "group",
+          source: "origin",
+        },
+      }),
+    ).toEqual([
+      {
+        name: "Gojo",
+        category: "Anime & Manga",
+        tags: ["Jujutsu Kaisen"],
+        source: "Manual",
+      },
+    ]);
+  });
 });
 
 describe("buildImportPreview", () => {
