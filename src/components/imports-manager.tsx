@@ -40,11 +40,10 @@ export function ImportsManager() {
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_520px]">
         <div className="panel overflow-hidden rounded-lg">
-          <table className="w-full min-w-[900px] text-left text-sm">
+          <table className="w-full min-w-[820px] text-left text-sm">
             <thead className="table-head">
               <tr>
                 <th className="p-3">Import</th>
-                <th className="p-3">Source</th>
                 <th className="p-3">Rows</th>
                 <th className="p-3">Imported</th>
                 <th className="p-3">Duplicates</th>
@@ -63,7 +62,6 @@ export function ImportsManager() {
                     </button>
                     <div className="font-mono text-xs text-zinc-500">{item.id}</div>
                   </td>
-                  <td className="p-3">{item.source?.name ?? "-"}</td>
                   <td className="p-3">{item.totalRows}</td>
                   <td className="p-3">{item.importedCount}</td>
                   <td className="p-3">{item.duplicateCount}</td>
@@ -141,4 +139,3 @@ function Detail({ label, value, mono = false }: { label: string; value: string; 
     </div>
   );
 }
-

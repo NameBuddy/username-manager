@@ -6,7 +6,6 @@ export type ExportCandidate = {
   category: { name: string } | null;
   tags: { tag: { name: string } }[];
   labels: { label: { name: string } }[];
-  score: number | null;
   candidateStatus: string;
   availabilityStatus: string;
   snipingStatus: string;
@@ -29,14 +28,7 @@ function toExportObject(candidate: ExportCandidate) {
     name: candidate.nameOriginal,
     normalizedName: candidate.nameNormalized,
     category: candidate.category?.name ?? null,
-    tags: candidate.tags.map(({ tag }) => tag.name),
     labels: candidate.labels.map(({ label }) => label.name),
-    score: candidate.score,
-    candidateStatus: candidate.candidateStatus,
-    availabilityStatus: candidate.availabilityStatus,
-    snipingStatus: candidate.snipingStatus,
-    source: candidate.source?.name ?? null,
-    notes: candidate.notes,
     createdAt: candidate.createdAt.toISOString(),
     lastCheckedAt: candidate.lastCheckedAt?.toISOString() ?? null,
   };
@@ -55,32 +47,18 @@ export function serializeCandidates(candidates: ExportCandidate[], format: Expor
     "name",
     "normalized_name",
     "category",
-    "tags",
     "labels",
-    "score",
-    "candidate_status",
-    "availability_status",
-    "sniping_status",
-    "source",
     "created_at",
     "last_checked_at",
-    "notes",
   ];
 
   const rows = candidates.map((candidate) => [
     candidate.nameOriginal,
     candidate.nameNormalized,
     candidate.category?.name ?? "",
-    candidate.tags.map(({ tag }) => tag.name).join(", "),
     candidate.labels.map(({ label }) => label.name).join(", "),
-    candidate.score ?? "",
-    candidate.candidateStatus,
-    candidate.availabilityStatus,
-    candidate.snipingStatus,
-    candidate.source?.name ?? "",
     candidate.createdAt.toISOString(),
     candidate.lastCheckedAt?.toISOString() ?? "",
-    candidate.notes ?? "",
   ]);
 
   return [header, ...rows].map((row) => row.map(escapeCsv).join(",")).join("\n") + "\n";
@@ -95,4 +73,3 @@ export function contentTypeForExport(format: ExportFormat): string {
   }
   return "text/plain; charset=utf-8";
 }
-

@@ -13,8 +13,6 @@ const patchSchema = z.object({
   labelIds: z.array(z.string().uuid()).optional(),
   labels: z.array(z.string()).optional(),
   sourceId: z.string().uuid().nullable().optional(),
-  score: z.number().int().min(0).max(100).nullable().optional(),
-  scoreReason: z.string().nullable().optional(),
   candidateStatus: z.string().optional(),
   availabilityStatus: z.string().optional(),
   snipingStatus: z.string().optional(),
@@ -52,11 +50,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
     if (body.categoryId !== undefined) data.categoryId = body.categoryId;
     if (body.sourceId !== undefined) data.sourceId = body.sourceId;
-    if (body.score !== undefined) {
-      data.score = body.score;
-      data.scoreUpdatedAt = new Date();
-    }
-    if (body.scoreReason !== undefined) data.scoreReason = body.scoreReason;
     if (body.candidateStatus !== undefined) data.candidateStatus = body.candidateStatus;
     if (body.availabilityStatus !== undefined) data.availabilityStatus = body.availabilityStatus;
     if (body.snipingStatus !== undefined) data.snipingStatus = body.snipingStatus;

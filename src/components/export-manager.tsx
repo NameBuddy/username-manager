@@ -2,20 +2,14 @@
 
 import { Download, Save } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
-import { availabilityStatuses, candidateStatuses, sortOptions, type SourceItem, type TaxonomyItem } from "@/lib/client-types";
+import { sortOptions, type TaxonomyItem } from "@/lib/client-types";
 
 const blankFilters = {
   search: "",
   categoryId: "",
-  tagId: "",
   labelId: "",
-  candidateStatus: "",
-  availabilityStatus: "",
-  sourceId: "",
   lengthMin: "",
   lengthMax: "",
-  scoreMin: "",
-  scoreMax: "",
   createdFrom: "",
   createdTo: "",
   lastCheckedFrom: "",
@@ -42,21 +36,17 @@ export function ExportManager() {
   const [format, setFormat] = useState<"txt" | "csv" | "json">("txt");
   const [filters, setFilters] = useState<Filters>(blankFilters);
   const [categories, setCategories] = useState<TaxonomyItem[]>([]);
-  const [tags, setTags] = useState<TaxonomyItem[]>([]);
   const [labels, setLabels] = useState<TaxonomyItem[]>([]);
-  const [sources, setSources] = useState<SourceItem[]>([]);
   const [count, setCount] = useState(0);
   const [presets, setPresets] = useState<Preset[]>([]);
-  const [presetName, setPresetName] = useState("High Value Pending Check");
+  const [presetName, setPresetName] = useState("Custom Export");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    Promise.all([fetch("/api/categories"), fetch("/api/tags"), fetch("/api/labels"), fetch("/api/sources")]).then(
-      async ([categoryResponse, tagResponse, labelResponse, sourceResponse]) => {
+    Promise.all([fetch("/api/categories"), fetch("/api/labels")]).then(
+      async ([categoryResponse, labelResponse]) => {
         setCategories(((await categoryResponse.json()) as { items: TaxonomyItem[] }).items ?? []);
-        setTags(((await tagResponse.json()) as { items: TaxonomyItem[] }).items ?? []);
         setLabels(((await labelResponse.json()) as { items: TaxonomyItem[] }).items ?? []);
-        setSources(((await sourceResponse.json()) as { items: SourceItem[] }).items ?? []);
       },
     );
     setPresets(JSON.parse(localStorage.getItem("namedb-export-presets") ?? "[]") as Preset[]);
@@ -116,15 +106,9 @@ export function ExportManager() {
           <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
             <Input label="Search" value={filters.search} onChange={(value) => setFilters({ ...filters, search: value })} />
             <Select label="Category" value={filters.categoryId} items={categories} onChange={(value) => setFilters({ ...filters, categoryId: value })} />
-            <Select label="Tag" value={filters.tagId} items={tags} onChange={(value) => setFilters({ ...filters, tagId: value })} />
             <Select label="Label" value={filters.labelId} items={labels} onChange={(value) => setFilters({ ...filters, labelId: value })} />
-            <Select label="Source" value={filters.sourceId} items={sources} onChange={(value) => setFilters({ ...filters, sourceId: value })} />
-            <PlainSelect label="Candidate status" value={filters.candidateStatus} options={candidateStatuses} onChange={(value) => setFilters({ ...filters, candidateStatus: value })} />
-            <PlainSelect label="Availability" value={filters.availabilityStatus} options={availabilityStatuses} onChange={(value) => setFilters({ ...filters, availabilityStatus: value })} />
             <Input label="Min length" value={filters.lengthMin} onChange={(value) => setFilters({ ...filters, lengthMin: value })} />
             <Input label="Max length" value={filters.lengthMax} onChange={(value) => setFilters({ ...filters, lengthMax: value })} />
-            <Input label="Min score" value={filters.scoreMin} onChange={(value) => setFilters({ ...filters, scoreMin: value })} />
-            <Input label="Max score" value={filters.scoreMax} onChange={(value) => setFilters({ ...filters, scoreMax: value })} />
             <Input label="Created from" type="date" value={filters.createdFrom} onChange={(value) => setFilters({ ...filters, createdFrom: value })} />
             <Input label="Created to" type="date" value={filters.createdTo} onChange={(value) => setFilters({ ...filters, createdTo: value })} />
             <Input label="Last checked from" type="date" value={filters.lastCheckedFrom} onChange={(value) => setFilters({ ...filters, lastCheckedFrom: value })} />
@@ -211,4 +195,3 @@ function PlainSelect({ label, value, options, labels, onChange }: { label: strin
     </label>
   );
 }
-

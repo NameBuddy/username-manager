@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireAdminApi } from "@/lib/auth";
 import { jsonError, jsonOk, readJson, toApiError } from "@/lib/api";
+import { inferCategoryWithDeepSeek } from "@/lib/category-inference";
 import { getOrCreateCategory, getOrCreateLabels, getOrCreateSource, getOrCreateTags } from "@/lib/db-helpers";
 import { candidateInclude, candidateOrderByFromParams, candidateWhereFromParams, paginationFromParams } from "@/lib/filters";
 import { lookupMinecraftProfile } from "@/lib/mojang";
@@ -15,10 +16,9 @@ const candidateSchema = z.object({
   tags: z.array(z.string()).optional().default([]),
   labelIds: z.array(z.string().uuid()).optional().default([]),
   labels: z.array(z.string()).optional().default([]),
+  autoCategorize: z.boolean().optional().default(true),
   sourceId: z.string().uuid().optional().nullable(),
   sourceName: z.string().optional().nullable(),
-  score: z.number().int().min(0).max(100).optional().nullable(),
-  scoreReason: z.string().optional().nullable(),
   candidateStatus: z.string().optional().default("active"),
   availabilityStatus: z.string().optional().default("unknown"),
   snipingStatus: z.string().optional().default("none"),
@@ -56,10 +56,6 @@ export async function POST(request: Request) {
     if (!validation.valid) {
       return jsonError(validation.reason, 400);
     }
-    if (!body.categoryId && !body.categoryName?.trim()) {
-      return jsonError("Category is required", 400);
-    }
-
     const normalized = normalizeUsername(body.nameOriginal);
     const existing = await prisma.candidate.findUnique({ where: { nameNormalized: normalized } });
     if (existing) {
@@ -71,10 +67,22 @@ export async function POST(request: Request) {
       return jsonError("No Minecraft profile found", 400);
     }
 
+    let categoryName = body.categoryName?.trim() || null;
+    if (!body.categoryId && !categoryName && body.autoCategorize) {
+      const categories = await prisma.category.findMany({ select: { name: true }, orderBy: { name: "asc" } });
+      categoryName = await inferCategoryWithDeepSeek(
+        body.nameOriginal,
+        categories.map((category) => category.name),
+      );
+    }
+    if (!body.categoryId && !categoryName) {
+      return jsonError("Category is required", 400);
+    }
+
     const created = await prisma.$transaction(async (tx) => {
       const category = body.categoryId
         ? await tx.category.findUnique({ where: { id: body.categoryId } })
-        : await getOrCreateCategory(body.categoryName, tx);
+        : await getOrCreateCategory(categoryName, tx);
       if (!category) {
         throw new Error("Category is required");
       }
@@ -93,9 +101,6 @@ export async function POST(request: Request) {
           length: normalized.length,
           categoryId: category.id,
           sourceId: source?.id,
-          score: body.score,
-          scoreReason: body.scoreReason,
-          scoreUpdatedAt: typeof body.score === "number" ? new Date() : null,
           candidateStatus: body.candidateStatus,
           availabilityStatus: body.availabilityStatus,
           snipingStatus: body.snipingStatus,

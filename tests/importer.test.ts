@@ -16,7 +16,7 @@ describe("parseImportPayload", () => {
       parseImportPayload({
         type: "csv",
         content:
-          'username,type,workflow,notes\nGojo,Anime & Manga,"High Value","Pending Check"',
+          'username,type,workflow,notes,score\nGojo,Anime & Manga,"Watchlist","Clean",99',
         columnMap: {
           name: "username",
           category: "type",
@@ -27,7 +27,7 @@ describe("parseImportPayload", () => {
       {
         name: "Gojo",
         category: "Anime & Manga",
-        labels: ["High Value", "Pending Check"],
+        labels: ["Watchlist", "Clean"],
       },
     ]);
     expect(parseImportPayload({ type: "json", content: '[{"name":"Madara","labels":["Naruto"]}]' })).toEqual([
@@ -69,7 +69,7 @@ describe("buildImportPreview", () => {
       existingCandidates: [{ id: "existing-1", nameNormalized: "satorugojo", nameOriginal: "SatoruGojo" }],
       existingCategories: ["Anime & Manga"],
       existingTags: [],
-      existingLabels: ["Pending Check"],
+      existingLabels: ["Watchlist"],
       minecraftProfiles: new Map([
         ["gojo", { id: "d8d5a9237b2043d8883b1150148d6955", name: "Gojo" }],
         ["satoru_gojo", { id: "11111111111111111111111111111111", name: "Satoru_Gojo" }],

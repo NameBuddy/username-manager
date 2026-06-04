@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   autoFillMissingImportCategories,
+  inferCategoryWithDeepSeek,
   inferCategoriesWithDeepSeek,
 } from "@/lib/category-inference";
 
@@ -105,5 +106,34 @@ describe("inferCategoriesWithDeepSeek", () => {
     await expect(inferCategoriesWithDeepSeek(["Gojo"], ["Anime & Manga"])).rejects.toThrow(
       "DEEPSEEK_API_KEY is required",
     );
+  });
+
+  it("can infer one category for manual candidate creation", async () => {
+    process.env.DEEPSEEK_API_KEY = "test-key";
+    const fetcher = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      void url;
+      void init;
+      return Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                assignments: [{ name: "Sukuna", category: "Anime & Manga" }],
+              }),
+            },
+          },
+        ],
+      });
+    });
+
+    await expect(
+      inferCategoryWithDeepSeek("Sukuna", ["Anime & Manga", "Game Characters"], fetcher),
+    ).resolves.toBe("Anime & Manga");
+
+    const [, init] = fetcher.mock.calls[0]!;
+    const body = JSON.parse(String(init?.body));
+    expect(body.messages[1].content).toContain("Anime & Manga");
+    expect(body.messages[1].content).toContain("Game Characters");
+    expect(body.messages[1].content).toContain("Sukuna");
   });
 });

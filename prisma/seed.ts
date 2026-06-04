@@ -21,49 +21,43 @@ const categories = [
   ["tech-ai-crypto", "Tech / AI / Crypto", "#111827"],
 ] as const;
 
-const tags = [
-  "Jujutsu Kaisen",
-  "Naruto",
-  "One Piece",
-  "Pokemon",
-  "Nintendo",
-  "Marvel",
-  "Greek Mythology",
-  "Short",
-  "Clean",
-  "Hype",
-  "Seasonal",
-  "Trending",
-  "Character",
-  "Villain",
-  "Main Character",
+const oldDefaultTagSlugs = [
+  "jujutsu-kaisen",
+  "naruto",
+  "one-piece",
+  "pokemon",
+  "nintendo",
+  "marvel",
+  "greek-mythology",
+  "short",
+  "clean",
+  "hype",
+  "seasonal",
+  "trending",
+  "character",
+  "villain",
+  "main-character",
 ];
 
-const labels = [
-  ["high-value", "High Value", "#dc2626"],
-  ["needs-review", "Needs Review", "#ca8a04"],
-  ["pending-check", "Pending Check", "#2563eb"],
-  ["checked", "Checked", "#16a34a"],
-  ["available", "Available", "#059669"],
-  ["unavailable", "Unavailable", "#71717a"],
-  ["sniped", "Sniped", "#7c3aed"],
-  ["ignore", "Ignore", "#52525b"],
-  ["duplicate-warning", "Duplicate Warning", "#ea580c"],
-  ["manual-pick", "Manual Pick", "#0891b2"],
-  ["imported", "Imported", "#4f46e5"],
-] as const;
+const oldDefaultLabelSlugs = [
+  "high-value",
+  "needs-review",
+  "pending-check",
+  "checked",
+  "available",
+  "unavailable",
+  "sniped",
+  "ignore",
+  "duplicate-warning",
+  "manual-pick",
+  "imported",
+];
 
 async function main() {
   await prisma.user.upsert({
     where: { email: accessUserEmail },
     update: { passwordHash: accessUserPasswordHash, role: "admin" },
     create: { email: accessUserEmail, passwordHash: accessUserPasswordHash, role: "admin" },
-  });
-
-  await prisma.source.upsert({
-    where: { name: "Manual Import" },
-    update: {},
-    create: { name: "Manual Import", type: "manual" },
   });
 
   for (const [slug, name, color] of categories) {
@@ -74,22 +68,10 @@ async function main() {
     });
   }
 
-  for (const name of tags) {
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    await prisma.tag.upsert({
-      where: { slug },
-      update: { name },
-      create: { slug, name },
-    });
-  }
-
-  for (const [slug, name, color] of labels) {
-    await prisma.label.upsert({
-      where: { slug },
-      update: { name, color },
-      create: { slug, name, color },
-    });
-  }
+  await prisma.candidateTag.deleteMany({ where: { tag: { slug: { in: oldDefaultTagSlugs } } } });
+  await prisma.tag.deleteMany({ where: { slug: { in: oldDefaultTagSlugs } } });
+  await prisma.candidateLabel.deleteMany({ where: { label: { slug: { in: oldDefaultLabelSlugs } } } });
+  await prisma.label.deleteMany({ where: { slug: { in: oldDefaultLabelSlugs } } });
 }
 
 main()

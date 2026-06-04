@@ -142,7 +142,6 @@ export async function POST(request: Request) {
               data: updateExisting
                 ? {
                     categoryId: category?.id,
-                    score: row.score,
                     notes: row.notes,
                     candidateStatus: row.candidateStatus,
                     availabilityStatus: row.availabilityStatus,
@@ -190,15 +189,11 @@ export async function POST(request: Request) {
           continue;
         }
         const tagsForRow = await resolveTags(row.tags, createMissing, tx);
-        const labelsForRow = await resolveLabels(
-          row.fuzzyDuplicateNames.length ? [...row.labels, "Duplicate Warning"] : row.labels,
-          createMissing,
-          tx,
-        );
+        const labelsForRow = await resolveLabels(row.labels, createMissing, tx);
 
         if (category && preview.newCategories.includes(category.name)) createdCategories.add(category.name);
         for (const tag of tagsForRow) if (preview.newTags.includes(tag.name)) createdTags.add(tag.name);
-        for (const label of labelsForRow) if (preview.newLabels.includes(label.name) || label.name === "Duplicate Warning") createdLabels.add(label.name);
+        for (const label of labelsForRow) if (preview.newLabels.includes(label.name)) createdLabels.add(label.name);
 
         const candidate = await tx.candidate.create({
           data: {
@@ -206,8 +201,6 @@ export async function POST(request: Request) {
             nameNormalized: row.nameNormalized,
             length: row.length,
             categoryId: category.id,
-            score: row.score,
-            scoreUpdatedAt: typeof row.score === "number" ? new Date() : null,
             candidateStatus: row.candidateStatus,
             availabilityStatus: row.availabilityStatus,
             snipingStatus: "none",

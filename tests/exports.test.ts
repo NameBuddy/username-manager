@@ -7,8 +7,8 @@ const candidates = [
     nameNormalized: "gojo",
     category: { name: "Anime & Manga" },
     tags: [{ tag: { name: "Jujutsu Kaisen" } }, { tag: { name: "Character" } }],
-    labels: [{ label: { name: "High Value" } }],
-    score: 95,
+    labels: [{ label: { name: "Watchlist" } }],
+    score: null,
     candidateStatus: "active",
     availabilityStatus: "pending_check",
     snipingStatus: "none",
@@ -26,7 +26,7 @@ describe("serializeCandidates", () => {
 
   it("exports csv metadata with quoted collection fields", () => {
     expect(serializeCandidates(candidates, "csv")).toContain(
-      'Gojo,gojo,Anime & Manga,"Jujutsu Kaisen, Character",High Value,95,active,pending_check,none,Manual Import,2026-06-04T00:00:00.000Z,,Main character',
+      "Gojo,gojo,Anime & Manga,Watchlist,2026-06-04T00:00:00.000Z,",
     );
   });
 
@@ -36,18 +36,10 @@ describe("serializeCandidates", () => {
         name: "Gojo",
         normalizedName: "gojo",
         category: "Anime & Manga",
-        tags: ["Jujutsu Kaisen", "Character"],
-        labels: ["High Value"],
-        score: 95,
-        candidateStatus: "active",
-        availabilityStatus: "pending_check",
-        snipingStatus: "none",
-        source: "Manual Import",
-        notes: "Main character",
+        labels: ["Watchlist"],
         createdAt: "2026-06-04T00:00:00.000Z",
         lastCheckedAt: null,
       },
     ]);
   });
 });
-

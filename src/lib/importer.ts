@@ -9,10 +9,8 @@ export type ParsedImportRow = {
   category?: string;
   tags?: string[];
   labels?: string[];
-  score?: number;
   source?: string;
   notes?: string;
-  scoreReason?: string;
   candidateStatus?: string;
   availabilityStatus?: string;
 };
@@ -84,27 +82,14 @@ function splitList(value: unknown): string[] {
   return uniqueNonEmpty(value.split(/[,;|]/g));
 }
 
-function scoreFrom(value: unknown): number | undefined {
-  if (value == null || value === "") {
-    return undefined;
-  }
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    return undefined;
-  }
-  return Math.max(0, Math.min(100, Math.round(parsed)));
-}
-
 function compactRow(row: ParsedImportRow): ParsedImportRow {
   const compact: ParsedImportRow = { name: row.name };
 
   if (row.category) compact.category = row.category;
   if (row.tags?.length) compact.tags = row.tags;
   if (row.labels?.length) compact.labels = row.labels;
-  if (typeof row.score === "number") compact.score = row.score;
   if (row.source) compact.source = row.source;
   if (row.notes) compact.notes = row.notes;
-  if (row.scoreReason) compact.scoreReason = row.scoreReason;
   if (row.candidateStatus) compact.candidateStatus = row.candidateStatus;
   if (row.availabilityStatus) compact.availabilityStatus = row.availabilityStatus;
 
@@ -177,8 +162,6 @@ export function parseImportPayload(input: ParsePayloadInput): ParsedImportRow[] 
             ...splitList(readMapped(row, "labels", map)),
             ...splitList(readMapped(row, "notes", map)),
           ]),
-          score: scoreFrom(readMapped(row, "score", map)),
-          scoreReason: textFrom(readField(row, "scoreReason") ?? readField(row, "score_reason")),
         });
       })
       .filter((row) => row.name);
@@ -206,7 +189,6 @@ export function parseImportPayload(input: ParsePayloadInput): ParsedImportRow[] 
           ...splitList(readMapped(mappedRow, "labels", map)),
           ...splitList(readMapped(mappedRow, "notes", map)),
         ]),
-        score: scoreFrom(readMapped(mappedRow, "score", map)),
       });
     })
     .filter((row) => row.name);
@@ -219,7 +201,7 @@ function mergeDefaults(row: ParsedImportRow, defaults: ImportDefaults) {
     tags: [],
     labels: uniqueNonEmpty([...(defaults.labels ?? []), ...(row.labels ?? [])]),
     source: null,
-    score: row.score ?? null,
+    score: null,
     notes: null,
     candidateStatus: "active",
     availabilityStatus: "unknown",

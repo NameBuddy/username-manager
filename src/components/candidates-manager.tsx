@@ -16,14 +16,14 @@ type CandidateForm = {
   nameOriginal: string;
   categoryId: string;
   labels: string;
-  score: string;
+  autoCategorize: boolean;
 };
 
 const emptyForm: CandidateForm = {
   nameOriginal: "",
   categoryId: "",
   labels: "",
-  score: "",
+  autoCategorize: true,
 };
 
 const initialFilters = {
@@ -42,7 +42,7 @@ function candidateToForm(candidate: CandidateItem): CandidateForm {
     nameOriginal: candidate.nameOriginal,
     categoryId: candidate.categoryId ?? "",
     labels: labelsToText(candidate),
-    score: candidate.score == null ? "" : String(candidate.score),
+    autoCategorize: true,
   };
 }
 
@@ -132,7 +132,7 @@ export function CandidatesManager() {
       nameOriginal: form.nameOriginal,
       categoryId: form.categoryId || null,
       labels: splitLabels(form.labels),
-      score: form.score === "" ? null : Number(form.score),
+      autoCategorize: form.autoCategorize,
     };
     const response = await fetch(active ? `/api/candidates/${active.id}` : "/api/candidates", {
       method: active ? "PATCH" : "POST",
@@ -253,7 +253,6 @@ export function CandidatesManager() {
                   <th className="p-3">Name</th>
                   <th className="p-3">Category</th>
                   <th className="p-3">Labels</th>
-                  <th className="p-3">Score</th>
                   <th className="p-3">Created</th>
                   <th className="p-3">Actions</th>
                 </tr>
@@ -274,7 +273,6 @@ export function CandidatesManager() {
                     <td className="p-3">
                       <ChipList values={candidate.labels.map(({ label }) => label.name)} />
                     </td>
-                    <td className="p-3">{candidate.score ?? "-"}</td>
                     <td className="p-3">{new Date(candidate.createdAt).toLocaleDateString()}</td>
                     <td className="p-3">
                       <button className="btn btn-secondary" type="button" onClick={() => void selectCandidate(candidate)} title="Edit candidate">
@@ -315,7 +313,7 @@ export function CandidatesManager() {
             <label className="grid gap-1 text-sm font-medium">
               Category
               <select className="field" value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })}>
-                <option value="">Select category</option>
+                <option value="">Auto category</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
@@ -327,13 +325,17 @@ export function CandidatesManager() {
               Labels
               <input className="field" value={form.labels} onChange={(event) => setForm({ ...form, labels: event.target.value })} />
             </label>
-            <label className="grid gap-1 text-sm font-medium">
-              Score
-              <input className="field" type="number" min="0" max="100" value={form.score} onChange={(event) => setForm({ ...form, score: event.target.value })} />
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.autoCategorize}
+                onChange={(event) => setForm({ ...form, autoCategorize: event.target.checked })}
+              />
+              DeepSeek category fill
             </label>
             {message ? <p className="rounded-md bg-zinc-100 px-3 py-2 text-sm text-zinc-700">{message}</p> : null}
             <div className="flex gap-2">
-              <button className="btn flex-1" disabled={busy || !form.nameOriginal.trim() || !form.categoryId} type="submit">
+              <button className="btn flex-1" disabled={busy || !form.nameOriginal.trim() || (!form.categoryId && !form.autoCategorize)} type="submit">
                 <Save size={16} />
                 Save
               </button>

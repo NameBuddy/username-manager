@@ -83,11 +83,8 @@ export const snipingStatuses = ["none", "queued", "sniping", "sniped", "failed",
 export const sortOptions = [
   ["newest", "Newest first"],
   ["oldest", "Oldest first"],
-  ["score_desc", "Score high to low"],
-  ["score_asc", "Score low to high"],
   ["az", "A to Z"],
   ["length_asc", "Length shortest first"],
   ["length_desc", "Length longest first"],
   ["last_checked", "Last checked"],
 ] as const;
-

@@ -57,7 +57,6 @@ export function candidateWhereFromParams(params: URLSearchParams): Prisma.Candid
   const source = params.get("source")?.trim();
   const duplicateStatus = params.get("duplicateStatus");
   const lengthRange = intRange(params, "lengthMin", "lengthMax") as Prisma.IntFilter | undefined;
-  const scoreRange = intRange(params, "scoreMin", "scoreMax");
   const createdRange = dateRange(params, "createdFrom", "createdTo") as Prisma.DateTimeFilter | undefined;
   const lastCheckedRange = dateRange(params, "lastCheckedFrom", "lastCheckedTo");
 
@@ -77,7 +76,6 @@ export function candidateWhereFromParams(params: URLSearchParams): Prisma.Candid
   if (tagId) where.tags = { some: { tagId } };
   if (labelId) where.labels = { some: { labelId } };
   if (lengthRange) where.length = lengthRange;
-  if (scoreRange) where.score = scoreRange;
   if (createdRange) where.createdAt = createdRange;
   if (lastCheckedRange) where.lastCheckedAt = lastCheckedRange;
   if (duplicateStatus === "warning") {
@@ -91,10 +89,6 @@ export function candidateOrderByFromParams(params: URLSearchParams): Prisma.Cand
   switch (params.get("sort")) {
     case "oldest":
       return { createdAt: "asc" };
-    case "score_desc":
-      return { score: { sort: "desc", nulls: "last" } };
-    case "score_asc":
-      return { score: { sort: "asc", nulls: "last" } };
     case "az":
       return { nameNormalized: "asc" };
     case "length_asc":
@@ -113,4 +107,3 @@ export function paginationFromParams(params: URLSearchParams) {
   const pageSize = Math.min(200, Math.max(10, Number(params.get("pageSize") ?? 50)));
   return { page, pageSize, skip: (page - 1) * pageSize, take: pageSize };
 }
-

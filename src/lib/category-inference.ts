@@ -133,6 +133,15 @@ Return json with this exact shape:
   return parseDeepSeekAssignments(content, categories);
 }
 
+export async function inferCategoryWithDeepSeek(
+  name: string,
+  existingCategories: string[],
+  fetcher: typeof fetch = fetch,
+) {
+  const categories = await inferCategoriesWithDeepSeek([name], existingCategories, fetcher);
+  return categories.get(normalizeUsername(name)) ?? null;
+}
+
 export async function autoFillMissingImportCategories({
   rows,
   defaults,
