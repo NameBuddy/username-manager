@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String           @id @default(uuid()) @db.Uuid
+  email        String           @unique
+  passwordHash String           @map("password_hash")
+  role         String           @default("admin")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  imports      Import[]
+  events       CandidateEvent[]
+
+  @@map("users")
+}
+
+model Candidate {
+  id                 String           @id @default(uuid()) @db.Uuid
+  nameOriginal       String           @map("name_original")
+  nameNormalized     String           @unique @map("name_normalized")
+  length             Int
+  categoryId         String?          @map("category_id") @db.Uuid
+  sourceId           String?          @map("source_id") @db.Uuid
+  score              Int?
+  scoreReason        String?          @map("score_reason")
+  scoreUpdatedAt     DateTime?        @map("score_updated_at")
+  candidateStatus    String           @default("active") @map("candidate_status")
+  availabilityStatus String           @default("unknown") @map("availability_status")
+  snipingStatus      String           @default("none") @map("sniping_status")
+  notes              String?
+  firstSeenAt        DateTime         @default(now()) @map("first_seen_at")
+  lastSeenAt         DateTime         @default(now()) @map("last_seen_at")
+  lastCheckedAt      DateTime?        @map("last_checked_at")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  category           Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  source             Source?          @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  tags               CandidateTag[]
+  labels             CandidateLabel[]
+  importRows         ImportRow[]
+  events             CandidateEvent[]
+
+  @@index([categoryId])
+  @@index([sourceId])
+  @@index([candidateStatus])
+  @@index([availabilityStatus])
+  @@index([score])
+  @@index([createdAt])
+  @@map("candidates")
+}
+
+model Category {
+  id          String      @id @default(uuid()) @db.Uuid
+  slug        String      @unique
+  name        String      @unique
+  description String?
+  color       String?
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  candidates  Candidate[]
+  imports     Import[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id          String         @id @default(uuid()) @db.Uuid
+  slug        String         @unique
+  name        String         @unique
+  description String?
+  color       String?
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  candidates  CandidateTag[]
+
+  @@map("tags")
+}
+
+model CandidateTag {
+  candidateId String    @map("candidate_id") @db.Uuid
+  tagId       String    @map("tag_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  tag         Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([candidateId, tagId])
+  @@map("candidate_tags")
+}
+
+model Label {
+  id          String           @id @default(uuid()) @db.Uuid
+  slug        String           @unique
+  name        String           @unique
+  description String?
+  color       String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  candidates  CandidateLabel[]
+
+  @@map("labels")
+}
+
+model CandidateLabel {
+  candidateId String    @map("candidate_id") @db.Uuid
+  labelId     String    @map("label_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  label       Label     @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([candidateId, labelId])
+  @@map("candidate_labels")
+}
+
+model Source {
+  id         String      @id @default(uuid()) @db.Uuid
+  name       String      @unique
+  type       String?
+  url        String?
+  notes      String?
+  createdAt  DateTime    @default(now()) @map("created_at")
+  candidates Candidate[]
+  imports    Import[]
+
+  @@map("sources")
+}
+
+model Import {
+  id                String      @id @default(uuid()) @db.Uuid
+  filename          String?
+  fileType          String?     @map("file_type")
+  sourceId          String?     @map("source_id") @db.Uuid
+  defaultCategoryId String?     @map("default_category_id") @db.Uuid
+  totalRows         Int         @default(0) @map("total_rows")
+  importedCount     Int         @default(0) @map("imported_count")
+  duplicateCount    Int         @default(0) @map("duplicate_count")
+  invalidCount      Int         @default(0) @map("invalid_count")
+  updatedCount      Int         @default(0) @map("updated_count")
+  createdById       String?     @map("created_by") @db.Uuid
+  createdAt         DateTime    @default(now()) @map("created_at")
+
+  source            Source?     @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  defaultCategory   Category?   @relation(fields: [defaultCategoryId], references: [id], onDelete: SetNull)
+  createdBy         User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  rows              ImportRow[]
+
+  @@index([createdAt])
+  @@map("imports")
+}
+
+model ImportRow {
+  id              String     @id @default(uuid()) @db.Uuid
+  importId        String     @map("import_id") @db.Uuid
+  rawValue        String?    @map("raw_value")
+  normalizedValue String?    @map("normalized_value")
+  status          String?
+  reason          String?
+  candidateId     String?    @map("candidate_id") @db.Uuid
+  createdAt       DateTime   @default(now()) @map("created_at")
+  import          Import     @relation(fields: [importId], references: [id], onDelete: Cascade)
+  candidate       Candidate? @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+
+  @@index([importId])
+  @@index([candidateId])
+  @@map("import_rows")
+}
+
+model CandidateEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  candidateId String    @map("candidate_id") @db.Uuid
+  eventType   String    @map("event_type")
+  oldValue    String?   @map("old_value")
+  newValue    String?   @map("new_value")
+  metadata    Json?
+  createdById String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([candidateId])
+  @@index([eventType])
+  @@map("candidate_events")
+}

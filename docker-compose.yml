@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: namedb-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: namedb
+      POSTGRES_PASSWORD: namedb
+      POSTGRES_DB: namedb
+    ports:
+      - "5433:5432"
+    volumes:
+      - namedb-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U namedb -d namedb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  namedb-postgres-data:
+
