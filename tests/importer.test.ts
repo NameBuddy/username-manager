@@ -54,6 +54,14 @@ describe("parseImportPayload", () => {
       },
     ]);
   });
+
+  it("parses single-column csv imports without treating delimiter warnings as fatal", () => {
+    expect(parseImportPayload({ type: "csv", content: "name\nCrown\nRoyal\nPenis" })).toEqual([
+      { name: "Crown" },
+      { name: "Royal" },
+      { name: "Penis" },
+    ]);
+  });
 });
 
 describe("buildImportPreview", () => {

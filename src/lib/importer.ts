@@ -173,8 +173,9 @@ export function parseImportPayload(input: ParsePayloadInput): ParsedImportRow[] 
     transformHeader: (header) => header.trim(),
   });
 
-  if (result.errors.length) {
-    throw new Error(result.errors[0]?.message ?? "CSV parse failed");
+  const fatalErrors = result.errors.filter((error) => error.code !== "UndetectableDelimiter");
+  if (fatalErrors.length) {
+    throw new Error(fatalErrors[0]?.message ?? "CSV parse failed");
   }
 
   const map = input.columnMap ?? {};
