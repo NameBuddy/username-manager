@@ -25,11 +25,21 @@ textarea {
   font: inherit;
 }
 
-button {
+button,
+.btn,
+a[href],
+select,
+input[type="checkbox"],
+input[type="radio"],
+label:has(input[type="file"]),
+label:has(input[type="checkbox"]),
+label:has(input[type="radio"]) {
   cursor: pointer;
 }
 
-button:disabled {
+button:disabled,
+.btn:disabled,
+.btn[aria-disabled="true"] {
   cursor: not-allowed;
   opacity: 0.6;
 }

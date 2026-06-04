@@ -3,6 +3,7 @@
 import { FileUp, Play, Upload } from "lucide-react";
 import { ChangeEvent, useEffect, useState } from "react";
 import { type TaxonomyItem } from "@/lib/client-types";
+import { getImportPrimaryActionState } from "@/lib/import-ui";
 
 type PreviewRow = {
   rowNumber: number;
@@ -63,11 +64,13 @@ export function ImportManager() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [createMissing, setCreateMissing] = useState(true);
   const [updateExisting, setUpdateExisting] = useState(false);
   const [mergeLabels, setMergeLabels] = useState(true);
   const [autoCategorizeMissingCategories, setAutoCategorizeMissingCategories] = useState(true);
+  const primaryAction = getImportPrimaryActionState({ busy, content, hasPreview: Boolean(preview) });
 
   useEffect(() => {
     fetch("/api/categories")
@@ -79,12 +82,30 @@ export function ImportManager() {
   async function readFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+    resetImportState();
     setFilename(file.name);
     const extension = file.name.split(".").pop()?.toLowerCase();
     if (extension === "csv") setType("csv");
     else if (extension === "json") setType("json");
     else setType("txt");
     setContent(await file.text());
+  }
+
+  function resetImportState() {
+    setPreview(null);
+    setResult(null);
+    setError("");
+    setStatusMessage("");
+  }
+
+  function changeType(nextType: "txt" | "csv" | "json") {
+    resetImportState();
+    setType(nextType);
+  }
+
+  function changeContent(nextContent: string) {
+    resetImportState();
+    setContent(nextContent);
   }
 
   function payload() {
@@ -105,9 +126,10 @@ export function ImportManager() {
     };
   }
 
-  async function runPreview() {
+  async function runPreview(options?: { promptForConfirmation?: boolean }) {
     setBusy(true);
     setError("");
+    setStatusMessage("");
     setResult(null);
     const response = await fetch("/api/import/preview", {
       method: "POST",
@@ -119,13 +141,26 @@ export function ImportManager() {
       setError(body?.error ?? "Preview failed");
     } else {
       setPreview(body.preview);
+      if (options?.promptForConfirmation) {
+        setStatusMessage("Preview generated. Review the rows below, then click Confirm to import.");
+      }
     }
     setBusy(false);
+  }
+
+  function runPrimaryAction() {
+    if (primaryAction.mode === "confirm") {
+      void confirmImport();
+      return;
+    }
+
+    void runPreview({ promptForConfirmation: true });
   }
 
   async function confirmImport() {
     setBusy(true);
     setError("");
+    setStatusMessage("");
     const response = await fetch("/api/import/confirm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -156,7 +191,7 @@ export function ImportManager() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex gap-2">
               {(["txt", "csv", "json"] as const).map((item) => (
-                <button key={item} className={`btn ${type === item ? "" : "btn-secondary"}`} type="button" onClick={() => setType(item)}>
+                <button key={item} className={`btn ${type === item ? "" : "btn-secondary"}`} type="button" onClick={() => changeType(item)}>
                   {item.toUpperCase()}
                 </button>
               ))}
@@ -167,7 +202,7 @@ export function ImportManager() {
               <input className="hidden" type="file" accept=".txt,.csv,.json" onChange={readFile} />
             </label>
           </div>
-          <textarea className="field min-h-[420px] font-mono text-sm" value={content} onChange={(event) => setContent(event.target.value)} />
+          <textarea className="field min-h-[420px] font-mono text-sm" value={content} onChange={(event) => changeContent(event.target.value)} />
           {filename ? <p className="mt-2 text-xs text-zinc-500">Loaded file: {filename}</p> : null}
         </div>
 
@@ -176,7 +211,7 @@ export function ImportManager() {
           <div className="grid gap-3">
             <label className="grid gap-1 text-sm font-medium">
               Default category
-              <select className="field" value={category} onChange={(event) => setCategory(event.target.value)}>
+              <select className="field" value={category} onChange={(event) => { resetImportState(); setCategory(event.target.value); }}>
                 <option value="">Select category</option>
                 {categories.map((item) => (
                   <option key={item.id} value={item.name}>
@@ -185,16 +220,16 @@ export function ImportManager() {
                 ))}
               </select>
             </label>
-            <Input label="Labels" value={labels} onChange={setLabels} />
+            <Input label="Labels" value={labels} onChange={(value) => { resetImportState(); setLabels(value); }} />
           </div>
 
           {type !== "txt" ? (
             <div className="mt-5 border-t border-zinc-200 pt-4">
               <h2 className="mb-3 text-lg font-semibold">{type.toUpperCase()} Mapping</h2>
               <div className="grid grid-cols-2 gap-2">
-                <Input label={`Name ${type === "json" ? "field" : "column"}`} value={nameColumn} onChange={setNameColumn} />
-                <Input label={`Category ${type === "json" ? "field" : "column"}`} value={categoryColumn} onChange={setCategoryColumn} />
-                <Input label={`Labels ${type === "json" ? "field" : "column"}`} value={labelsColumn} onChange={setLabelsColumn} />
+                <Input label={`Name ${type === "json" ? "field" : "column"}`} value={nameColumn} onChange={(value) => { resetImportState(); setNameColumn(value); }} />
+                <Input label={`Category ${type === "json" ? "field" : "column"}`} value={categoryColumn} onChange={(value) => { resetImportState(); setCategoryColumn(value); }} />
+                <Input label={`Labels ${type === "json" ? "field" : "column"}`} value={labelsColumn} onChange={(value) => { resetImportState(); setLabelsColumn(value); }} />
               </div>
             </div>
           ) : null}
@@ -204,7 +239,7 @@ export function ImportManager() {
               <input
                 type="checkbox"
                 checked={autoCategorizeMissingCategories}
-                onChange={(event) => setAutoCategorizeMissingCategories(event.target.checked)}
+                onChange={(event) => { resetImportState(); setAutoCategorizeMissingCategories(event.target.checked); }}
               />
               DeepSeek category fill
             </label>
@@ -223,14 +258,16 @@ export function ImportManager() {
           </div>
 
           {error ? <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+          {statusMessage ? <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{statusMessage}</p> : null}
+          {!error && !statusMessage && primaryAction.hint ? <p className="mt-4 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-600">{primaryAction.hint}</p> : null}
           <div className="mt-5 flex gap-2">
             <button className="btn btn-secondary flex-1" type="button" disabled={busy || !content.trim()} onClick={() => void runPreview()}>
               <Play size={16} />
               Preview
             </button>
-            <button className="btn flex-1" type="button" disabled={busy || !preview} onClick={() => void confirmImport()}>
+            <button className="btn flex-1" type="button" disabled={primaryAction.disabled} title={primaryAction.title} onClick={runPrimaryAction}>
               <Upload size={16} />
-              Confirm
+              {primaryAction.label}
             </button>
           </div>
         </aside>
