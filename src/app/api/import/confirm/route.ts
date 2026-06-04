@@ -3,7 +3,12 @@ import type { Prisma } from "@prisma/client";
 import { requireAdminApi } from "@/lib/auth";
 import { jsonOk, readJson, toApiError } from "@/lib/api";
 import { getOrCreateCategory, getOrCreateLabels, getOrCreateSource, getOrCreateTags } from "@/lib/db-helpers";
-import { buildImportPreview, parseImportPayload, type ImportPreviewRow } from "@/lib/importer";
+import {
+  buildImportPreview,
+  lookupMinecraftProfilesForImportRows,
+  parseImportPayload,
+  type ImportPreviewRow,
+} from "@/lib/importer";
 import { slugify } from "@/lib/names";
 import { prisma } from "@/lib/prisma";
 
@@ -18,7 +23,6 @@ const schema = z.object({
       tags: z.array(z.string()).optional(),
       labels: z.array(z.string()).optional(),
       source: z.string().optional(),
-      score: z.number().int().min(0).max(100).optional(),
       notes: z.string().optional(),
       candidateStatus: z.string().optional(),
       availabilityStatus: z.string().optional(),
@@ -57,6 +61,7 @@ export async function POST(request: Request) {
     const updateExisting = body.options?.updateExisting ?? false;
     const mergeTagsLabels = body.options?.mergeTagsLabels ?? true;
     const rows = parseImportPayload(body);
+    const minecraftProfiles = await lookupMinecraftProfilesForImportRows(rows);
     const [existingCandidates, categories, tags, labels] = await Promise.all([
       prisma.candidate.findMany({ select: { id: true, nameNormalized: true, nameOriginal: true } }),
       prisma.category.findMany({ select: { name: true } }),
@@ -70,6 +75,7 @@ export async function POST(request: Request) {
       existingCategories: categories.map((item) => item.name),
       existingTags: tags.map((item) => item.name),
       existingLabels: labels.map((item) => item.name),
+      minecraftProfiles,
     });
 
     const result = await prisma.$transaction(async (tx) => {
@@ -79,7 +85,7 @@ export async function POST(request: Request) {
         data: {
           filename: body.filename,
           fileType: body.type,
-          sourceId: source.id,
+          sourceId: source?.id,
           defaultCategoryId: defaultCategory?.id,
           totalRows: preview.summary.totalRows,
           createdById: session.userId,
@@ -122,6 +128,11 @@ export async function POST(request: Request) {
         if (duplicate) {
           if (updateExisting || mergeTagsLabels) {
             const category = updateExisting ? await resolveCategory(row.category, createMissing, tx) : null;
+            if (updateExisting && !category) {
+              invalidCount += 1;
+              await writeImportRow(row, "invalid", "Category is required");
+              continue;
+            }
             const tagIds = (await resolveTags(row.tags, createMissing, tx)).map((tag) => tag.id);
             const labelIds = (await resolveLabels(row.labels, createMissing, tx)).map((label) => label.id);
 
@@ -130,7 +141,7 @@ export async function POST(request: Request) {
               data: updateExisting
                 ? {
                     categoryId: category?.id,
-                    sourceId: source.id,
+                    sourceId: source?.id,
                     score: row.score,
                     notes: row.notes,
                     candidateStatus: row.candidateStatus,
@@ -173,6 +184,11 @@ export async function POST(request: Request) {
         }
 
         const category = await resolveCategory(row.category, createMissing, tx);
+        if (!category) {
+          invalidCount += 1;
+          await writeImportRow(row, "invalid", "Category is required");
+          continue;
+        }
         const tagsForRow = await resolveTags(row.tags, createMissing, tx);
         const labelsForRow = await resolveLabels(
           row.fuzzyDuplicateNames.length ? [...row.labels, "Duplicate Warning"] : row.labels,
@@ -189,8 +205,8 @@ export async function POST(request: Request) {
             nameOriginal: row.nameOriginal,
             nameNormalized: row.nameNormalized,
             length: row.length,
-            categoryId: category?.id,
-            sourceId: source.id,
+            categoryId: category.id,
+            sourceId: source?.id,
             score: row.score,
             scoreUpdatedAt: typeof row.score === "number" ? new Date() : null,
             candidateStatus: row.candidateStatus,

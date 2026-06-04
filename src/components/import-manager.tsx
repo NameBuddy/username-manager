@@ -57,10 +57,9 @@ export function ImportManager() {
   const [filename, setFilename] = useState("");
   const [content, setContent] = useState(sample);
   const [category, setCategory] = useState("");
-  const [tags, setTags] = useState("Popular Anime, Character");
-  const [labels, setLabels] = useState("Pending Check, Imported");
-  const [source, setSource] = useState("Manual Import");
-  const [score, setScore] = useState("80");
+  const [tags, setTags] = useState("");
+  const [labels, setLabels] = useState("");
+  const [source, setSource] = useState("");
   const [notes, setNotes] = useState("");
   const [candidateStatus, setCandidateStatus] = useState("active");
   const [availabilityStatus, setAvailabilityStatus] = useState("pending_check");
@@ -110,8 +109,7 @@ export function ImportManager() {
         category: category || undefined,
         tags: split(tags),
         labels: split(labels),
-        source,
-        score: score === "" ? undefined : Number(score),
+        source: source || undefined,
         notes,
         candidateStatus,
         availabilityStatus,
@@ -190,8 +188,8 @@ export function ImportManager() {
           <div className="grid gap-3">
             <label className="grid gap-1 text-sm font-medium">
               Category
-              <select className="field" value={category} onChange={(event) => setCategory(event.target.value)}>
-                <option value="">No default</option>
+              <select className="field" required value={category} onChange={(event) => setCategory(event.target.value)}>
+                <option value="">Select category</option>
                 {categories.map((item) => (
                   <option key={item.id} value={item.name}>
                     {item.name}
@@ -202,7 +200,6 @@ export function ImportManager() {
             <Input label="Tags" value={tags} onChange={setTags} />
             <Input label="Labels" value={labels} onChange={setLabels} />
             <Input label="Source" value={source} onChange={setSource} />
-            <Input label="Default score" value={score} onChange={setScore} type="number" />
             <label className="grid gap-1 text-sm font-medium">
               Candidate status
               <select className="field" value={candidateStatus} onChange={(event) => setCandidateStatus(event.target.value)}>
@@ -258,7 +255,7 @@ export function ImportManager() {
 
           {error ? <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
           <div className="mt-5 flex gap-2">
-            <button className="btn btn-secondary flex-1" type="button" disabled={busy || !content.trim()} onClick={() => void runPreview()}>
+            <button className="btn btn-secondary flex-1" type="button" disabled={busy || !content.trim() || !category} onClick={() => void runPreview()}>
               <Play size={16} />
               Preview
             </button>
@@ -367,4 +364,3 @@ function TaxonomyPreview({ label, values }: { label: string; values: string[] })
     </div>
   );
 }
-

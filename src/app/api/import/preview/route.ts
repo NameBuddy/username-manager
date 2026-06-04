@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { requireAdminApi } from "@/lib/auth";
 import { jsonOk, readJson, toApiError } from "@/lib/api";
-import { buildImportPreview, parseImportPayload } from "@/lib/importer";
+import { buildImportPreview, lookupMinecraftProfilesForImportRows, parseImportPayload } from "@/lib/importer";
 import { prisma } from "@/lib/prisma";
 
 const schema = z.object({
@@ -14,7 +14,6 @@ const schema = z.object({
       tags: z.array(z.string()).optional(),
       labels: z.array(z.string()).optional(),
       source: z.string().optional(),
-      score: z.number().int().min(0).max(100).optional(),
       notes: z.string().optional(),
       candidateStatus: z.string().optional(),
       availabilityStatus: z.string().optional(),
@@ -27,6 +26,7 @@ export async function POST(request: Request) {
     await requireAdminApi();
     const body = schema.parse(await readJson(request));
     const rows = parseImportPayload(body);
+    const minecraftProfiles = await lookupMinecraftProfilesForImportRows(rows);
     const [existingCandidates, categories, tags, labels] = await Promise.all([
       prisma.candidate.findMany({ select: { id: true, nameNormalized: true, nameOriginal: true } }),
       prisma.category.findMany({ select: { name: true } }),
@@ -41,6 +41,7 @@ export async function POST(request: Request) {
       existingCategories: categories.map((item) => item.name),
       existingTags: tags.map((item) => item.name),
       existingLabels: labels.map((item) => item.name),
+      minecraftProfiles,
     });
 
     return jsonOk({ preview });
@@ -48,4 +49,3 @@ export async function POST(request: Request) {
     return toApiError(error);
   }
 }
-

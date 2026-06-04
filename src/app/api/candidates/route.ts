@@ -3,6 +3,7 @@ import { requireAdminApi } from "@/lib/auth";
 import { jsonError, jsonOk, readJson, toApiError } from "@/lib/api";
 import { getOrCreateCategory, getOrCreateLabels, getOrCreateSource, getOrCreateTags } from "@/lib/db-helpers";
 import { candidateInclude, candidateOrderByFromParams, candidateWhereFromParams, paginationFromParams } from "@/lib/filters";
+import { lookupMinecraftProfile } from "@/lib/mojang";
 import { normalizeUsername, validateMinecraftUsername } from "@/lib/names";
 import { prisma } from "@/lib/prisma";
 
@@ -55,6 +56,9 @@ export async function POST(request: Request) {
     if (!validation.valid) {
       return jsonError(validation.reason, 400);
     }
+    if (!body.categoryId && !body.categoryName?.trim()) {
+      return jsonError("Category is required", 400);
+    }
 
     const normalized = normalizeUsername(body.nameOriginal);
     const existing = await prisma.candidate.findUnique({ where: { nameNormalized: normalized } });
@@ -62,10 +66,18 @@ export async function POST(request: Request) {
       return jsonError("Candidate already exists", 409);
     }
 
+    const profile = await lookupMinecraftProfile(body.nameOriginal);
+    if (!profile) {
+      return jsonError("No Minecraft profile found", 400);
+    }
+
     const created = await prisma.$transaction(async (tx) => {
       const category = body.categoryId
         ? await tx.category.findUnique({ where: { id: body.categoryId } })
         : await getOrCreateCategory(body.categoryName, tx);
+      if (!category) {
+        throw new Error("Category is required");
+      }
       const source = body.sourceId
         ? await tx.source.findUnique({ where: { id: body.sourceId } })
         : await getOrCreateSource(body.sourceName, tx);
@@ -79,7 +91,7 @@ export async function POST(request: Request) {
           nameOriginal: body.nameOriginal.trim(),
           nameNormalized: normalized,
           length: normalized.length,
-          categoryId: category?.id,
+          categoryId: category.id,
           sourceId: source?.id,
           score: body.score,
           scoreReason: body.scoreReason,
@@ -111,4 +123,3 @@ export async function POST(request: Request) {
     return toApiError(error);
   }
 }
-

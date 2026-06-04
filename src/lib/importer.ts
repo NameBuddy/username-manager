@@ -1,4 +1,5 @@
 import Papa from "papaparse";
+import { lookupMinecraftProfile, type MinecraftProfile } from "@/lib/mojang";
 import { buildFuzzyKey, normalizeUsername, slugify, uniqueNonEmpty, validateMinecraftUsername } from "@/lib/names";
 
 export type ImportFormat = "txt" | "csv" | "json";
@@ -21,7 +22,6 @@ export type ImportDefaults = {
   tags?: string[];
   labels?: string[];
   source?: string;
-  score?: number;
   notes?: string;
   candidateStatus?: string;
   availabilityStatus?: string;
@@ -46,6 +46,8 @@ export type ImportPreviewRow = {
   notes: string | null;
   candidateStatus: string;
   availabilityStatus: string;
+  minecraftProfileId: string | null;
+  minecraftProfileName: string | null;
   status: "valid" | "invalid" | "duplicate";
   reason: string | null;
   duplicateCandidateId: string | null;
@@ -178,11 +180,31 @@ function mergeDefaults(row: ParsedImportRow, defaults: ImportDefaults) {
     tags: uniqueNonEmpty([...(defaults.tags ?? []), ...(row.tags ?? [])]),
     labels: uniqueNonEmpty([...(defaults.labels ?? []), ...(row.labels ?? [])]),
     source: row.source ?? defaults.source ?? null,
-    score: row.score ?? defaults.score ?? null,
+    score: row.score ?? null,
     notes: row.notes ?? defaults.notes ?? null,
     candidateStatus: row.candidateStatus ?? defaults.candidateStatus ?? "active",
     availabilityStatus: row.availabilityStatus ?? defaults.availabilityStatus ?? "unknown",
   };
+}
+
+export async function lookupMinecraftProfilesForImportRows(rows: ParsedImportRow[]) {
+  const namesByNormalized = new Map<string, string>();
+
+  for (const row of rows) {
+    if (!validateMinecraftUsername(row.name).valid) {
+      continue;
+    }
+    namesByNormalized.set(normalizeUsername(row.name), row.name);
+  }
+
+  const entries = await Promise.all(
+    [...namesByNormalized.entries()].map(async ([normalized, name]) => [
+      normalized,
+      await lookupMinecraftProfile(name),
+    ] as const),
+  );
+
+  return new Map(entries);
 }
 
 export function buildImportPreview(input: {
@@ -192,6 +214,7 @@ export function buildImportPreview(input: {
   existingCategories: string[];
   existingTags: string[];
   existingLabels: string[];
+  minecraftProfiles?: Map<string, MinecraftProfile | null>;
 }): ImportPreview {
   const defaults = input.defaults ?? {};
   const existingByNormalized = new Map(input.existingCandidates.map((candidate) => [candidate.nameNormalized, candidate]));
@@ -224,14 +247,28 @@ export function buildImportPreview(input: {
     let status: ImportPreviewRow["status"] = "valid";
     let reason: string | null = null;
     let duplicateCandidateId: string | null = null;
+    let minecraftProfileId: string | null = null;
+    let minecraftProfileName: string | null = null;
 
     if (!validation.valid) {
       status = "invalid";
       reason = validation.reason;
+    } else if (!row.category) {
+      status = "invalid";
+      reason = "Category is required";
     } else if (existing || duplicateInImport) {
       status = "duplicate";
       reason = existing ? "Exact duplicate already exists" : "Exact duplicate in import";
       duplicateCandidateId = existing?.id ?? null;
+    } else if (input.minecraftProfiles) {
+      const profile = input.minecraftProfiles.get(normalized);
+      if (!profile) {
+        status = "invalid";
+        reason = "No Minecraft profile found";
+      } else {
+        minecraftProfileId = profile.id;
+        minecraftProfileName = profile.name;
+      }
     }
 
     const previewRow: ImportPreviewRow = {
@@ -247,6 +284,8 @@ export function buildImportPreview(input: {
       notes: row.notes,
       candidateStatus: row.candidateStatus,
       availabilityStatus: row.availabilityStatus,
+      minecraftProfileId,
+      minecraftProfileName,
       status,
       reason,
       duplicateCandidateId,

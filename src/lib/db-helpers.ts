@@ -30,7 +30,8 @@ export async function getOrCreateCategory(name?: string | null, tx: Prisma.Trans
 }
 
 export async function getOrCreateSource(name?: string | null, tx: Prisma.TransactionClient = prisma) {
-  const cleanName = name?.trim() || "Manual Import";
+  const cleanName = name?.trim();
+  if (!cleanName) return null;
   return tx.source.upsert({
     where: { name: cleanName },
     update: {},
@@ -71,4 +72,3 @@ export async function getOrCreateLabels(names: string[] = [], tx: Prisma.Transac
 
   return labels;
 }
-

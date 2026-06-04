@@ -4,9 +4,7 @@ import { buildImportPreview, parseImportPayload } from "@/lib/importer";
 const baseDefaults = {
   category: "Anime & Manga",
   tags: ["Jujutsu Kaisen"],
-  labels: ["Pending Check"],
-  source: "Manual Import",
-  score: 80,
+  labels: [],
   candidateStatus: "active",
   availabilityStatus: "pending_check",
   notes: "",
@@ -55,6 +53,10 @@ describe("buildImportPreview", () => {
       existingCategories: ["Anime & Manga"],
       existingTags: [],
       existingLabels: ["Pending Check"],
+      minecraftProfiles: new Map([
+        ["gojo", { id: "d8d5a9237b2043d8883b1150148d6955", name: "Gojo" }],
+        ["satoru_gojo", { id: "11111111111111111111111111111111", name: "Satoru_Gojo" }],
+      ]),
     });
 
     expect(preview.summary).toMatchObject({
@@ -73,5 +75,47 @@ describe("buildImportPreview", () => {
     expect(preview.newTags).toEqual(["Jujutsu Kaisen"]);
     expect(preview.newCategories).toEqual([]);
   });
-});
 
+  it("requires a category for every import row", () => {
+    const preview = buildImportPreview({
+      rows: [{ name: "Test" }],
+      defaults: {},
+      existingCandidates: [],
+      existingCategories: [],
+      existingTags: [],
+      existingLabels: [],
+      minecraftProfiles: new Map([["test", { id: "d8d5a9237b2043d8883b1150148d6955", name: "Test" }]]),
+    });
+
+    expect(preview.summary.invalidRows).toBe(1);
+    expect(preview.rows[0]).toMatchObject({
+      status: "invalid",
+      reason: "Category is required",
+    });
+  });
+
+  it("filters out locally valid names that do not resolve to a Mojang profile UUID", () => {
+    const preview = buildImportPreview({
+      rows: [{ name: "Test" }, { name: "penis" }],
+      defaults: baseDefaults,
+      existingCandidates: [],
+      existingCategories: ["Anime & Manga"],
+      existingTags: [],
+      existingLabels: [],
+      minecraftProfiles: new Map([["test", { id: "d8d5a9237b2043d8883b1150148d6955", name: "Test" }]]),
+    });
+
+    expect(preview.summary).toMatchObject({
+      validRows: 1,
+      invalidRows: 1,
+    });
+    expect(preview.rows[0]).toMatchObject({
+      status: "valid",
+      minecraftProfileId: "d8d5a9237b2043d8883b1150148d6955",
+    });
+    expect(preview.rows[1]).toMatchObject({
+      status: "invalid",
+      reason: "No Minecraft profile found",
+    });
+  });
+});
