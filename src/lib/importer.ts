@@ -133,9 +133,15 @@ function textFrom(value: unknown): string | undefined {
   return text || undefined;
 }
 
+export function normalizeImportContent(content: string) {
+  return content.replace(/\r\n?/g, "\n").trimEnd();
+}
+
 export function parseImportPayload(input: ParsePayloadInput): ParsedImportRow[] {
+  const content = normalizeImportContent(input.content);
+
   if (input.type === "txt") {
-    return input.content
+    return content
       .split(/\r?\n/g)
       .map((line) => line.trim())
       .filter(Boolean)
@@ -143,7 +149,7 @@ export function parseImportPayload(input: ParsePayloadInput): ParsedImportRow[] 
   }
 
   if (input.type === "json") {
-    const parsed = JSON.parse(input.content) as unknown;
+    const parsed = JSON.parse(content) as unknown;
     if (!Array.isArray(parsed)) {
       throw new Error("JSON import must be an array");
     }
@@ -167,7 +173,7 @@ export function parseImportPayload(input: ParsePayloadInput): ParsedImportRow[] 
       .filter((row) => row.name);
   }
 
-  const result = Papa.parse<Record<string, unknown>>(input.content, {
+  const result = Papa.parse<Record<string, unknown>>(content, {
     header: true,
     skipEmptyLines: true,
     transformHeader: (header) => header.trim(),

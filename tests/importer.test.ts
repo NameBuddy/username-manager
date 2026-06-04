@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildImportPreview, lookupMinecraftProfilesForImportRows, parseImportPayload } from "@/lib/importer";
+import {
+  buildImportPreview,
+  lookupMinecraftProfilesForImportRows,
+  normalizeImportContent,
+  parseImportPayload,
+} from "@/lib/importer";
 import type { MinecraftProfile } from "@/lib/mojang";
 
 const baseDefaults = {
@@ -11,6 +16,10 @@ const baseDefaults = {
 };
 
 describe("parseImportPayload", () => {
+  it("normalizes uploaded file line endings before parsing", () => {
+    expect(normalizeImportContent("name,category\r\nCrown,English Words\r\n")).toBe("name,category\nCrown,English Words");
+  });
+
   it("parses pasted text, csv, and json rows into candidate inputs", () => {
     expect(parseImportPayload({ type: "txt", content: "Gojo\nSukuna" })).toHaveLength(2);
     expect(
