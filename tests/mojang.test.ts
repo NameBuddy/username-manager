@@ -12,6 +12,7 @@ describe("lookupMinecraftProfile", () => {
     expect(fetcher).toHaveBeenCalledWith("https://api.mojang.com/users/profiles/minecraft/Test", {
       cache: "no-store",
       headers: { Accept: "application/json" },
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -27,5 +28,16 @@ describe("lookupMinecraftProfile", () => {
     );
 
     await expect(lookupMinecraftProfile("penis", fetcher)).resolves.toBeNull();
+  });
+
+  it("returns null when the Mojang request times out", async () => {
+    vi.useFakeTimers();
+    const fetcher = vi.fn(() => new Promise<Response>(() => undefined));
+
+    const lookup = lookupMinecraftProfile("Stalled", fetcher, { timeoutMs: 10 });
+    await vi.advanceTimersByTimeAsync(10);
+
+    await expect(lookup).resolves.toBeNull();
+    vi.useRealTimers();
   });
 });
