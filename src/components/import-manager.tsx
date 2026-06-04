@@ -2,7 +2,7 @@
 
 import { FileUp, Play, Upload } from "lucide-react";
 import { ChangeEvent, useEffect, useState } from "react";
-import { availabilityStatuses, candidateStatuses, type TaxonomyItem } from "@/lib/client-types";
+import { type TaxonomyItem } from "@/lib/client-types";
 
 type PreviewRow = {
   rowNumber: number;
@@ -43,8 +43,6 @@ type ImportResult = {
   };
 };
 
-const sample = "Gojo\nSukuna\nMadara\nItachi\nZoro\nLuffy";
-
 function split(value: string) {
   return value
     .split(/[,;|]/g)
@@ -55,20 +53,12 @@ function split(value: string) {
 export function ImportManager() {
   const [type, setType] = useState<"txt" | "csv" | "json">("txt");
   const [filename, setFilename] = useState("");
-  const [content, setContent] = useState(sample);
+  const [content, setContent] = useState("");
   const [category, setCategory] = useState("");
-  const [tags, setTags] = useState("");
   const [labels, setLabels] = useState("");
-  const [source, setSource] = useState("");
-  const [notes, setNotes] = useState("");
-  const [candidateStatus, setCandidateStatus] = useState("active");
-  const [availabilityStatus, setAvailabilityStatus] = useState("pending_check");
   const [nameColumn, setNameColumn] = useState("name");
   const [categoryColumn, setCategoryColumn] = useState("category");
-  const [tagsColumn, setTagsColumn] = useState("tags");
   const [labelsColumn, setLabelsColumn] = useState("labels");
-  const [sourceColumn, setSourceColumn] = useState("source");
-  const [notesColumn, setNotesColumn] = useState("notes");
   const [categories, setCategories] = useState<TaxonomyItem[]>([]);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -76,7 +66,7 @@ export function ImportManager() {
   const [busy, setBusy] = useState(false);
   const [createMissing, setCreateMissing] = useState(true);
   const [updateExisting, setUpdateExisting] = useState(false);
-  const [mergeTagsLabels, setMergeTagsLabels] = useState(true);
+  const [mergeLabels, setMergeLabels] = useState(true);
   const [autoCategorizeMissingCategories, setAutoCategorizeMissingCategories] = useState(true);
 
   useEffect(() => {
@@ -105,19 +95,11 @@ export function ImportManager() {
       columnMap: {
         name: nameColumn,
         category: categoryColumn,
-        tags: tagsColumn,
         labels: labelsColumn,
-        source: sourceColumn,
-        notes: notesColumn,
       },
       defaults: {
         category: category || undefined,
-        tags: split(tags),
         labels: split(labels),
-        source: source || undefined,
-        notes,
-        candidateStatus,
-        availabilityStatus,
       },
       options: { autoCategorizeMissingCategories },
     };
@@ -149,7 +131,7 @@ export function ImportManager() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...payload(),
-        options: { createMissing, updateExisting, mergeTagsLabels, autoCategorizeMissingCategories },
+        options: { createMissing, updateExisting, mergeTagsLabels: mergeLabels, autoCategorizeMissingCategories },
       }),
     });
     const body = (await response.json().catch(() => null)) as { result?: ImportResult; error?: string } | null;
@@ -203,33 +185,7 @@ export function ImportManager() {
                 ))}
               </select>
             </label>
-            <Input label="Tags" value={tags} onChange={setTags} />
             <Input label="Labels" value={labels} onChange={setLabels} />
-            <Input label="Source" value={source} onChange={setSource} />
-            <label className="grid gap-1 text-sm font-medium">
-              Candidate status
-              <select className="field" value={candidateStatus} onChange={(event) => setCandidateStatus(event.target.value)}>
-                {candidateStatuses.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1 text-sm font-medium">
-              Availability status
-              <select className="field" value={availabilityStatus} onChange={(event) => setAvailabilityStatus(event.target.value)}>
-                {availabilityStatuses.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1 text-sm font-medium">
-              Notes
-              <textarea className="field min-h-20" value={notes} onChange={(event) => setNotes(event.target.value)} />
-            </label>
           </div>
 
           {type !== "txt" ? (
@@ -238,10 +194,7 @@ export function ImportManager() {
               <div className="grid grid-cols-2 gap-2">
                 <Input label={`Name ${type === "json" ? "field" : "column"}`} value={nameColumn} onChange={setNameColumn} />
                 <Input label={`Category ${type === "json" ? "field" : "column"}`} value={categoryColumn} onChange={setCategoryColumn} />
-                <Input label={`Tags ${type === "json" ? "field" : "column"}`} value={tagsColumn} onChange={setTagsColumn} />
                 <Input label={`Labels ${type === "json" ? "field" : "column"}`} value={labelsColumn} onChange={setLabelsColumn} />
-                <Input label={`Source ${type === "json" ? "field" : "column"}`} value={sourceColumn} onChange={setSourceColumn} />
-                <Input label={`Notes ${type === "json" ? "field" : "column"}`} value={notesColumn} onChange={setNotesColumn} />
               </div>
             </div>
           ) : null}
@@ -257,11 +210,11 @@ export function ImportManager() {
             </label>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={createMissing} onChange={(event) => setCreateMissing(event.target.checked)} />
-              Create missing categories, tags, labels
+              Create missing categories and labels
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" checked={mergeTagsLabels} onChange={(event) => setMergeTagsLabels(event.target.checked)} />
-              Merge tags and labels into duplicates
+              <input type="checkbox" checked={mergeLabels} onChange={(event) => setMergeLabels(event.target.checked)} />
+              Merge labels into duplicates
             </label>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={updateExisting} onChange={(event) => setUpdateExisting(event.target.checked)} />
@@ -293,9 +246,8 @@ export function ImportManager() {
             <Stat label="Exact duplicates" value={preview.summary.exactDuplicates} />
             <Stat label="Fuzzy warnings" value={preview.summary.fuzzyDuplicates} />
           </div>
-          <div className="mb-4 grid gap-3 md:grid-cols-3">
+          <div className="mb-4 grid gap-3 md:grid-cols-2">
             <TaxonomyPreview label="New categories" values={preview.newCategories} />
-            <TaxonomyPreview label="New tags" values={preview.newTags} />
             <TaxonomyPreview label="New labels" values={preview.newLabels} />
           </div>
           <div className="overflow-auto">
@@ -309,7 +261,6 @@ export function ImportManager() {
                   <th className="p-3">Status</th>
                   <th className="p-3">Reason</th>
                   <th className="p-3">Fuzzy matches</th>
-                  <th className="p-3">Tags</th>
                   <th className="p-3">Labels</th>
                 </tr>
               </thead>
@@ -323,7 +274,6 @@ export function ImportManager() {
                     <td className="p-3"><span className="chip">{row.status}</span></td>
                     <td className="p-3">{row.reason ?? "-"}</td>
                     <td className="p-3">{row.fuzzyDuplicateNames.join(", ") || "-"}</td>
-                    <td className="p-3">{row.tags.join(", ")}</td>
                     <td className="p-3">{row.labels.join(", ")}</td>
                   </tr>
                 ))}

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireAdminApi } from "@/lib/auth";
 import { jsonError, jsonOk, readJson, toApiError } from "@/lib/api";
+import { getOrCreateLabels } from "@/lib/db-helpers";
 import { candidateDetailInclude } from "@/lib/filters";
 import { normalizeUsername, validateMinecraftUsername } from "@/lib/names";
 import { prisma } from "@/lib/prisma";
@@ -10,6 +11,7 @@ const patchSchema = z.object({
   categoryId: z.string().uuid().nullable().optional(),
   tagIds: z.array(z.string().uuid()).optional(),
   labelIds: z.array(z.string().uuid()).optional(),
+  labels: z.array(z.string()).optional(),
   sourceId: z.string().uuid().nullable().optional(),
   score: z.number().int().min(0).max(100).nullable().optional(),
   scoreReason: z.string().nullable().optional(),
@@ -70,11 +72,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
           });
         }
       }
-      if (body.labelIds) {
+      if (body.labelIds !== undefined || body.labels !== undefined) {
+        const newLabels = await getOrCreateLabels(body.labels ?? [], tx);
+        const labelIds = [...(body.labelIds ?? []), ...newLabels.map((label) => label.id)];
         await tx.candidateLabel.deleteMany({ where: { candidateId: id } });
-        if (body.labelIds.length) {
+        if (labelIds.length) {
           await tx.candidateLabel.createMany({
-            data: body.labelIds.map((labelId) => ({ candidateId: id, labelId })),
+            data: labelIds.map((labelId) => ({ candidateId: id, labelId })),
             skipDuplicates: true,
           });
         }
@@ -128,4 +132,3 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
     return toApiError(error);
   }
 }
-

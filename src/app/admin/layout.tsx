@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, Download, FolderTree, History, Import, Tags, Ticket, UsersRound } from "lucide-react";
+import { BarChart3, Download, FolderTree, History, Import, UsersRound } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { LogoutButton } from "@/components/logout-button";
 
@@ -9,8 +9,6 @@ const nav = [
   { href: "/admin/import", label: "Import", icon: Import },
   { href: "/admin/export", label: "Export", icon: Download },
   { href: "/admin/categories", label: "Categories", icon: FolderTree },
-  { href: "/admin/tags", label: "Tags", icon: Tags },
-  { href: "/admin/labels", label: "Labels", icon: Ticket },
   { href: "/admin/imports", label: "Import History", icon: History },
 ];
 

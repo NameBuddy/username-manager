@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { requireAdminApi } from "@/lib/auth";
 import { jsonOk, readJson, toApiError } from "@/lib/api";
 import { autoFillMissingImportCategories } from "@/lib/category-inference";
-import { getOrCreateCategory, getOrCreateLabels, getOrCreateSource, getOrCreateTags } from "@/lib/db-helpers";
+import { getOrCreateCategory, getOrCreateLabels, getOrCreateTags } from "@/lib/db-helpers";
 import {
   buildImportPreview,
   lookupMinecraftProfilesForImportRows,
@@ -21,12 +21,7 @@ const schema = z.object({
   defaults: z
     .object({
       category: z.string().optional(),
-      tags: z.array(z.string()).optional(),
       labels: z.array(z.string()).optional(),
-      source: z.string().optional(),
-      notes: z.string().optional(),
-      candidateStatus: z.string().optional(),
-      availabilityStatus: z.string().optional(),
     })
     .optional(),
   options: z
@@ -64,10 +59,9 @@ export async function POST(request: Request) {
     const updateExisting = body.options?.updateExisting ?? false;
     const mergeTagsLabels = body.options?.mergeTagsLabels ?? true;
     const parsedRows = parseImportPayload(body);
-    const [existingCandidates, categories, tags, labels] = await Promise.all([
+    const [existingCandidates, categories, labels] = await Promise.all([
       prisma.candidate.findMany({ select: { id: true, nameNormalized: true, nameOriginal: true } }),
       prisma.category.findMany({ select: { name: true } }),
-      prisma.tag.findMany({ select: { name: true } }),
       prisma.label.findMany({ select: { name: true } }),
     ]);
     const rows = await autoFillMissingImportCategories({
@@ -82,19 +76,17 @@ export async function POST(request: Request) {
       defaults: body.defaults,
       existingCandidates,
       existingCategories: categories.map((item) => item.name),
-      existingTags: tags.map((item) => item.name),
+      existingTags: [],
       existingLabels: labels.map((item) => item.name),
       minecraftProfiles,
     });
 
     const result = await prisma.$transaction(async (tx) => {
-      const source = await getOrCreateSource(body.defaults?.source, tx);
       const defaultCategory = await resolveCategory(body.defaults?.category ?? null, createMissing, tx);
       const importBatch = await tx.import.create({
         data: {
           filename: body.filename,
           fileType: body.type,
-          sourceId: source?.id,
           defaultCategoryId: defaultCategory?.id,
           totalRows: preview.summary.totalRows,
           createdById: session.userId,
@@ -150,7 +142,6 @@ export async function POST(request: Request) {
               data: updateExisting
                 ? {
                     categoryId: category?.id,
-                    sourceId: source?.id,
                     score: row.score,
                     notes: row.notes,
                     candidateStatus: row.candidateStatus,
@@ -215,7 +206,6 @@ export async function POST(request: Request) {
             nameNormalized: row.nameNormalized,
             length: row.length,
             categoryId: category.id,
-            sourceId: source?.id,
             score: row.score,
             scoreUpdatedAt: typeof row.score === "number" ? new Date() : null,
             candidateStatus: row.candidateStatus,

@@ -3,7 +3,6 @@ import { buildImportPreview, parseImportPayload } from "@/lib/importer";
 
 const baseDefaults = {
   category: "Anime & Manga",
-  tags: ["Jujutsu Kaisen"],
   labels: [],
   candidateStatus: "active",
   availabilityStatus: "pending_check",
@@ -17,11 +16,10 @@ describe("parseImportPayload", () => {
       parseImportPayload({
         type: "csv",
         content:
-          'username,type,group,workflow\nGojo,Anime & Manga,"Jujutsu Kaisen,Character","High Value"',
+          'username,type,workflow,notes\nGojo,Anime & Manga,"High Value","Pending Check"',
         columnMap: {
           name: "username",
           category: "type",
-          tags: "group",
           labels: "workflow",
         },
       }),
@@ -29,12 +27,11 @@ describe("parseImportPayload", () => {
       {
         name: "Gojo",
         category: "Anime & Manga",
-        tags: ["Jujutsu Kaisen", "Character"],
-        labels: ["High Value"],
+        labels: ["High Value", "Pending Check"],
       },
     ]);
-    expect(parseImportPayload({ type: "json", content: '[{"name":"Madara","tags":["Naruto"]}]' })).toEqual([
-      { name: "Madara", tags: ["Naruto"] },
+    expect(parseImportPayload({ type: "json", content: '[{"name":"Madara","labels":["Naruto"]}]' })).toEqual([
+      { name: "Madara", labels: ["Naruto"] },
     ]);
   });
 
@@ -46,16 +43,14 @@ describe("parseImportPayload", () => {
         columnMap: {
           name: "username",
           category: "type",
-          tags: "group",
-          source: "origin",
+          labels: "group",
         },
       }),
     ).toEqual([
       {
         name: "Gojo",
         category: "Anime & Manga",
-        tags: ["Jujutsu Kaisen"],
-        source: "Manual",
+        labels: ["Jujutsu Kaisen"],
       },
     ]);
   });
@@ -94,7 +89,7 @@ describe("buildImportPreview", () => {
       "valid",
       "invalid",
     ]);
-    expect(preview.newTags).toEqual(["Jujutsu Kaisen"]);
+    expect(preview.newTags).toEqual([]);
     expect(preview.newCategories).toEqual([]);
   });
 

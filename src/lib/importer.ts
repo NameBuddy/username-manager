@@ -173,11 +173,11 @@ export function parseImportPayload(input: ParsePayloadInput): ParsedImportRow[] 
         return compactRow({
           name: String(readMapped(row, "name", map) ?? readField(row, "username") ?? readField(row, "candidate") ?? "").trim(),
           category: textFrom(readMapped(row, "category", map)),
-          tags: splitList(readMapped(row, "tags", map)),
-          labels: splitList(readMapped(row, "labels", map)),
+          labels: uniqueNonEmpty([
+            ...splitList(readMapped(row, "labels", map)),
+            ...splitList(readMapped(row, "notes", map)),
+          ]),
           score: scoreFrom(readMapped(row, "score", map)),
-          source: textFrom(readMapped(row, "source", map)),
-          notes: textFrom(readMapped(row, "notes", map)),
           scoreReason: textFrom(readField(row, "scoreReason") ?? readField(row, "score_reason")),
         });
       })
@@ -202,11 +202,11 @@ export function parseImportPayload(input: ParsePayloadInput): ParsedImportRow[] 
       return compactRow({
         name: String(readMapped(mappedRow, "name", map) ?? readField(mappedRow, "username") ?? readField(mappedRow, "candidate") ?? "").trim(),
         category: textFrom(readMapped(mappedRow, "category", map)),
-        tags: splitList(readMapped(mappedRow, "tags", map)),
-        labels: splitList(readMapped(mappedRow, "labels", map)),
+        labels: uniqueNonEmpty([
+          ...splitList(readMapped(mappedRow, "labels", map)),
+          ...splitList(readMapped(mappedRow, "notes", map)),
+        ]),
         score: scoreFrom(readMapped(mappedRow, "score", map)),
-        source: textFrom(readMapped(mappedRow, "source", map)),
-        notes: textFrom(readMapped(mappedRow, "notes", map)),
       });
     })
     .filter((row) => row.name);
@@ -216,13 +216,13 @@ function mergeDefaults(row: ParsedImportRow, defaults: ImportDefaults) {
   return {
     name: row.name,
     category: row.category ?? defaults.category ?? null,
-    tags: uniqueNonEmpty([...(defaults.tags ?? []), ...(row.tags ?? [])]),
+    tags: [],
     labels: uniqueNonEmpty([...(defaults.labels ?? []), ...(row.labels ?? [])]),
-    source: row.source ?? defaults.source ?? null,
+    source: null,
     score: row.score ?? null,
-    notes: row.notes ?? defaults.notes ?? null,
-    candidateStatus: row.candidateStatus ?? defaults.candidateStatus ?? "active",
-    availabilityStatus: row.availabilityStatus ?? defaults.availabilityStatus ?? "unknown",
+    notes: null,
+    candidateStatus: "active",
+    availabilityStatus: "unknown",
   };
 }
 

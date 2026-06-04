@@ -12,12 +12,7 @@ const schema = z.object({
   defaults: z
     .object({
       category: z.string().optional(),
-      tags: z.array(z.string()).optional(),
       labels: z.array(z.string()).optional(),
-      source: z.string().optional(),
-      notes: z.string().optional(),
-      candidateStatus: z.string().optional(),
-      availabilityStatus: z.string().optional(),
     })
     .optional(),
   options: z
@@ -33,10 +28,9 @@ export async function POST(request: Request) {
     await requireAdminApi();
     const body = schema.parse(await readJson(request));
     const parsedRows = parseImportPayload(body);
-    const [existingCandidates, categories, tags, labels] = await Promise.all([
+    const [existingCandidates, categories, labels] = await Promise.all([
       prisma.candidate.findMany({ select: { id: true, nameNormalized: true, nameOriginal: true } }),
       prisma.category.findMany({ select: { name: true } }),
-      prisma.tag.findMany({ select: { name: true } }),
       prisma.label.findMany({ select: { name: true } }),
     ]);
     const rows = await autoFillMissingImportCategories({
@@ -52,7 +46,7 @@ export async function POST(request: Request) {
       defaults: body.defaults,
       existingCandidates,
       existingCategories: categories.map((item) => item.name),
-      existingTags: tags.map((item) => item.name),
+      existingTags: [],
       existingLabels: labels.map((item) => item.name),
       minecraftProfiles,
     });
