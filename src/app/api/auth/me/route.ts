@@ -7,9 +7,8 @@ export async function GET() {
     if (!session) {
       return jsonError("Authentication required", 401);
     }
-    return jsonOk({ user: { id: session.userId, email: session.email, role: session.role } });
+    return jsonOk({ user: { id: session.userId, role: session.role } });
   } catch (error) {
     return toApiError(error);
   }
 }
-

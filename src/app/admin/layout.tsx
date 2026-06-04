@@ -15,14 +15,14 @@ const nav = [
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await requireAdmin();
+  await requireAdmin();
 
   return (
     <div className="min-h-screen bg-[#f5f3ee] text-zinc-950">
       <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-zinc-200 bg-white/90 p-4 lg:flex lg:flex-col">
         <Link href="/admin" className="mb-8 block">
           <div className="text-xl font-bold tracking-tight">NameDB</div>
-          <div className="text-xs text-zinc-500">{session.email}</div>
+          <div className="text-xs text-zinc-500">Private admin</div>
         </Link>
         <nav className="grid gap-1">
           {nav.map((item) => {
@@ -55,4 +55,3 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     </div>
   );
 }
-

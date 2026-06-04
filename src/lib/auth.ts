@@ -1,22 +1,36 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 
 export const SESSION_COOKIE = "namedb_session";
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 180;
+export const ACCESS_USER_EMAIL = "access@namedb.local";
+const ACCESS_USER_PASSWORD_HASH = "access-password-login-disabled";
 
 export type SessionPayload = {
   userId: string;
-  email: string;
   role: "admin";
   expiresAt?: number;
 };
 
-const DEFAULT_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
-
 function getSessionSecret(): string {
   return process.env.SESSION_SECRET ?? "test-session-secret-with-at-least-32-chars";
+}
+
+export function isAccessPasswordConfigured(): boolean {
+  return Boolean(process.env.ACCESS_PASSWORD);
+}
+
+export function verifyAccessPassword(password: string): boolean {
+  const configuredPassword = process.env.ACCESS_PASSWORD;
+  if (!configuredPassword || !password) {
+    return false;
+  }
+
+  const expected = Buffer.from(configuredPassword, "utf8");
+  const actual = Buffer.from(password, "utf8");
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
 function base64url(value: string): string {
@@ -68,20 +82,19 @@ export async function verifySessionValue(value?: string | null): Promise<Session
   }
 }
 
-export async function createSessionCookie(user: { id: string; email: string; role: string }) {
+export async function createSessionCookie(user: { id: string; role: string }) {
   const cookieStore = await cookies();
   const value = await signSessionValue({
     userId: user.id,
-    email: user.email,
     role: "admin",
-    expiresAt: Date.now() + DEFAULT_MAX_AGE_SECONDS * 1000,
+    expiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
   });
 
   cookieStore.set(SESSION_COOKIE, value, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: DEFAULT_MAX_AGE_SECONDS,
+    maxAge: SESSION_MAX_AGE_SECONDS,
     path: "/",
   });
 }
@@ -119,13 +132,10 @@ export class AuthError extends Error {
   }
 }
 
-export async function verifyPasswordLogin(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
-  if (!user || user.role !== "admin") {
-    return null;
-  }
-
-  const matches = await bcrypt.compare(password, user.passwordHash);
-  return matches ? user : null;
+export async function getAccessUser() {
+  return prisma.user.upsert({
+    where: { email: ACCESS_USER_EMAIL },
+    update: { passwordHash: ACCESS_USER_PASSWORD_HASH, role: "admin" },
+    create: { email: ACCESS_USER_EMAIL, passwordHash: ACCESS_USER_PASSWORD_HASH, role: "admin" },
+  });
 }
-

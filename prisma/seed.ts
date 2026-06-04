@@ -1,7 +1,8 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+const accessUserEmail = "access@namedb.local";
+const accessUserPasswordHash = "access-password-login-disabled";
 
 const categories = [
   ["anime-manga", "Anime & Manga", "#ef4444"],
@@ -53,14 +54,10 @@ const labels = [
 ] as const;
 
 async function main() {
-  const email = process.env.ADMIN_EMAIL ?? "admin@namedb.local";
-  const password = process.env.ADMIN_PASSWORD ?? "ChangeMe123!";
-  const passwordHash = await bcrypt.hash(password, 12);
-
   await prisma.user.upsert({
-    where: { email },
-    update: { passwordHash, role: "admin" },
-    create: { email, passwordHash, role: "admin" },
+    where: { email: accessUserEmail },
+    update: { passwordHash: accessUserPasswordHash, role: "admin" },
+    create: { email: accessUserEmail, passwordHash: accessUserPasswordHash, role: "admin" },
   });
 
   await prisma.source.upsert({
@@ -104,4 +101,3 @@ main()
     await prisma.$disconnect();
     process.exit(1);
   });
-

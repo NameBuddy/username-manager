@@ -6,8 +6,7 @@ import { FormEvent, useState } from "react";
 
 export function LoginForm() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@namedb.local");
-  const [password, setPassword] = useState("ChangeMe123!");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -19,7 +18,7 @@ export function LoginForm() {
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ password }),
     });
 
     if (!response.ok) {
@@ -40,15 +39,18 @@ export function LoginForm() {
           <LockKeyhole size={18} />
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">NameDB Admin</h1>
-        <p className="mt-1 text-sm text-zinc-600">Sign in to manage Minecraft username candidates.</p>
+        <p className="mt-1 text-sm text-zinc-600">Enter the access password to manage username candidates.</p>
       </div>
       <label className="grid gap-1 text-sm font-medium">
-        Email
-        <input className="field" value={email} onChange={(event) => setEmail(event.target.value)} type="email" />
-      </label>
-      <label className="grid gap-1 text-sm font-medium">
-        Password
-        <input className="field" value={password} onChange={(event) => setPassword(event.target.value)} type="password" />
+        Access Password
+        <input
+          autoComplete="current-password"
+          autoFocus
+          className="field"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          type="password"
+        />
       </label>
       {error ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
       <button className="btn" disabled={busy} type="submit">
@@ -57,4 +59,3 @@ export function LoginForm() {
     </form>
   );
 }
-
