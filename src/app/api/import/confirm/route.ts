@@ -10,6 +10,7 @@ import {
   parseImportPayload,
   type ImportPreviewRow,
 } from "@/lib/importer";
+import { importConfirmTransactionOptions } from "@/lib/import-confirm";
 import { slugify } from "@/lib/names";
 import { prisma } from "@/lib/prisma";
 
@@ -239,7 +240,7 @@ export async function POST(request: Request) {
           importBatchId: importBatch.id,
         },
       };
-    });
+    }, importConfirmTransactionOptions);
 
     return jsonOk({ result, preview });
   } catch (error) {

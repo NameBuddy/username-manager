@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { buildImportPreview, parseImportPayload } from "@/lib/importer";
+import { describe, expect, it, vi } from "vitest";
+import { buildImportPreview, lookupMinecraftProfilesForImportRows, parseImportPayload } from "@/lib/importer";
+import type { MinecraftProfile } from "@/lib/mojang";
 
 const baseDefaults = {
   category: "Anime & Manga",
@@ -142,5 +143,38 @@ describe("buildImportPreview", () => {
       status: "invalid",
       reason: "No Minecraft profile found",
     });
+  });
+});
+
+describe("lookupMinecraftProfilesForImportRows", () => {
+  it("limits concurrent Mojang profile lookups", async () => {
+    let activeLookups = 0;
+    let maxActiveLookups = 0;
+    const releaseLookup: Array<() => void> = [];
+
+    const lookup = vi.fn(
+      (name: string) =>
+        new Promise<MinecraftProfile>((resolve) => {
+          activeLookups += 1;
+          maxActiveLookups = Math.max(maxActiveLookups, activeLookups);
+          releaseLookup.push(() => {
+            activeLookups -= 1;
+            resolve({ id: "d8d5a9237b2043d8883b1150148d6955", name });
+          });
+        }),
+    );
+
+    const result = lookupMinecraftProfilesForImportRows(
+      [{ name: "Crown" }, { name: "Royal" }, { name: "Noble" }],
+      { lookup, concurrency: 2 },
+    );
+
+    await vi.waitFor(() => expect(lookup).toHaveBeenCalledTimes(2));
+    releaseLookup.shift()?.();
+    await vi.waitFor(() => expect(lookup).toHaveBeenCalledTimes(3));
+    while (releaseLookup.length) releaseLookup.shift()?.();
+
+    await expect(result).resolves.toHaveProperty("size", 3);
+    expect(maxActiveLookups).toBe(2);
   });
 });

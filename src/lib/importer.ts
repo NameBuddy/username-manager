@@ -209,8 +209,36 @@ function mergeDefaults(row: ParsedImportRow, defaults: ImportDefaults) {
   };
 }
 
-export async function lookupMinecraftProfilesForImportRows(rows: ParsedImportRow[]) {
+type MinecraftProfileLookup = (name: string) => Promise<MinecraftProfile | null>;
+
+type MinecraftProfileLookupOptions = {
+  lookup?: MinecraftProfileLookup;
+  concurrency?: number;
+};
+
+async function mapWithConcurrency<T, U>(items: T[], concurrency: number, mapper: (item: T) => Promise<U>) {
+  const results = new Array<U>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index]);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
+  return results;
+}
+
+export async function lookupMinecraftProfilesForImportRows(
+  rows: ParsedImportRow[],
+  options: MinecraftProfileLookupOptions = {},
+) {
   const namesByNormalized = new Map<string, string>();
+  const lookup = options.lookup ?? lookupMinecraftProfile;
+  const concurrency = Math.max(1, options.concurrency ?? 6);
 
   for (const row of rows) {
     if (!validateMinecraftUsername(row.name).valid) {
@@ -219,11 +247,10 @@ export async function lookupMinecraftProfilesForImportRows(rows: ParsedImportRow
     namesByNormalized.set(normalizeUsername(row.name), row.name);
   }
 
-  const entries = await Promise.all(
-    [...namesByNormalized.entries()].map(async ([normalized, name]) => [
+  const entries = await mapWithConcurrency([...namesByNormalized.entries()], concurrency, async ([normalized, name]) => [
       normalized,
-      await lookupMinecraftProfile(name),
-    ] as const),
+      await lookup(name),
+    ] as const,
   );
 
   return new Map(entries);
