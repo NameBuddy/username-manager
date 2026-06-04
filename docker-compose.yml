@@ -1,22 +1,43 @@
 services:
-  postgres:
-    image: postgres:17-alpine
-    container_name: namedb-postgres
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
-      POSTGRES_USER: namedb
-      POSTGRES_PASSWORD: namedb
-      POSTGRES_DB: namedb
-    ports:
-      - "5433:5432"
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-namedb}:${POSTGRES_PASSWORD:-namedb}@postgres:5432/${POSTGRES_DB:-namedb}?schema=public
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-before-production-with-a-long-random-secret}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@namedb.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-namedb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-namedb}
+      POSTGRES_DB: ${POSTGRES_DB:-namedb}
     volumes:
       - namedb-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U namedb -d namedb"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-namedb} -d ${POSTGRES_DB:-namedb}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
   namedb-postgres-data:
-
