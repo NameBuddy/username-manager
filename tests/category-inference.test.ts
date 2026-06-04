@@ -100,6 +100,42 @@ describe("inferCategoriesWithDeepSeek", () => {
     expect(body.messages[0].content).toContain("json");
   });
 
+  it("splits larger category inference requests into bounded batches", async () => {
+    process.env.DEEPSEEK_API_KEY = "test-key";
+    const names = Array.from({ length: 60 }, (_, index) => `Name${index + 1}`);
+    const fetcher = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { messages: Array<{ content: string }> };
+      const requestedNames = body.messages[1]!.content
+        .split("\n")
+        .filter((line) => line.startsWith("- Name"))
+        .map((line) => line.slice(2));
+
+      return Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                assignments: requestedNames.map((name) => ({ name, category: "English Words" })),
+              }),
+            },
+          },
+        ],
+      });
+    });
+
+    const categories = await inferCategoriesWithDeepSeek(names, ["English Words"], fetcher);
+
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(categories.size).toBe(60);
+    for (const call of fetcher.mock.calls) {
+      const [, init] = call;
+      const body = JSON.parse(String(init?.body)) as { messages: Array<{ content: string }> };
+      const requestedCount = body.messages[1]!.content.split("\n").filter((line) => line.startsWith("- Name")).length;
+      expect(requestedCount).toBeLessThanOrEqual(25);
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+    }
+  });
+
   it("requires DEEPSEEK_API_KEY", async () => {
     delete process.env.DEEPSEEK_API_KEY;
 

@@ -247,6 +247,9 @@ export async function lookupMinecraftProfilesForImportRows(
   const concurrency = Math.max(1, options.concurrency ?? 6);
 
   for (const row of rows) {
+    if (!row.category?.trim()) {
+      continue;
+    }
     if (!validateMinecraftUsername(row.name).valid) {
       continue;
     }

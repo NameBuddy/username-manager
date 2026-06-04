@@ -23,6 +23,22 @@ type DeepSeekCategoryJson = {
   assignments?: unknown;
 };
 
+const DEFAULT_DEEPSEEK_TIMEOUT_MS = 20000;
+const DEFAULT_DEEPSEEK_BATCH_SIZE = 25;
+
+function positiveEnvInt(name: string, fallback: number) {
+  const parsed = Number.parseInt(process.env[name] ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function chunkNames(names: string[], size: number) {
+  const chunks: string[][] = [];
+  for (let index = 0; index < names.length; index += size) {
+    chunks.push(names.slice(index, index + size));
+  }
+  return chunks;
+}
+
 function maxTokensFor(names: string[]) {
   return Math.max(600, Math.min(4000, 300 + names.length * 50));
 }
@@ -84,6 +100,30 @@ export async function inferCategoriesWithDeepSeek(
     throw new Error("DEEPSEEK_API_KEY is required to auto-fill import categories");
   }
 
+  const timeoutMs = positiveEnvInt("DEEPSEEK_CATEGORY_TIMEOUT_MS", DEFAULT_DEEPSEEK_TIMEOUT_MS);
+  const batchSize = positiveEnvInt("DEEPSEEK_CATEGORY_BATCH_SIZE", DEFAULT_DEEPSEEK_BATCH_SIZE);
+  const assignments = new Map<string, string>();
+
+  for (const batch of chunkNames(uniqueNames, batchSize)) {
+    const batchAssignments = await inferDeepSeekCategoryBatch(batch, categories, apiKey, timeoutMs, fetcher);
+    for (const [name, category] of batchAssignments) {
+      assignments.set(name, category);
+    }
+  }
+
+  return assignments;
+}
+
+async function inferDeepSeekCategoryBatch(
+  uniqueNames: string[],
+  categories: string[],
+  apiKey: string,
+  timeoutMs: number,
+  fetcher: typeof fetch,
+) {
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
   const systemPrompt = `You categorize Minecraft username candidates into existing categories.
 Return only valid json. Do not use markdown.
 Use exactly one category from the provided category list for every username.
@@ -100,12 +140,13 @@ ${uniqueNames.map((name) => `- ${name}`).join("\n")}
 Return json with this exact shape:
 {"assignments":[{"name":"<same username>","category":"<one provided category>"}]}`;
 
-  const response = await fetcher("https://api.deepseek.com/chat/completions", {
+  const request = fetcher("https://api.deepseek.com/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
+    signal: controller.signal,
     body: JSON.stringify({
       model: "deepseek-v4-flash",
       messages: [
@@ -117,6 +158,19 @@ Return json with this exact shape:
       temperature: 0,
       stream: false,
     }),
+  });
+
+  const timeoutRequest = new Promise<Response>((_, reject) => {
+    timeout = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`DeepSeek category inference timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  const response = await Promise.race([request, timeoutRequest]).finally(() => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
   });
 
   if (!response.ok) {

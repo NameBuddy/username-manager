@@ -174,7 +174,11 @@ describe("lookupMinecraftProfilesForImportRows", () => {
     );
 
     const result = lookupMinecraftProfilesForImportRows(
-      [{ name: "Crown" }, { name: "Royal" }, { name: "Noble" }],
+      [
+        { name: "Crown", category: "English Words" },
+        { name: "Royal", category: "English Words" },
+        { name: "Noble", category: "English Words" },
+      ],
       { lookup, concurrency: 2 },
     );
 
@@ -185,5 +189,24 @@ describe("lookupMinecraftProfilesForImportRows", () => {
 
     await expect(result).resolves.toHaveProperty("size", 3);
     expect(maxActiveLookups).toBe(2);
+  });
+
+  it("skips Mojang profile lookups for rows that cannot be imported without a category", async () => {
+    const lookup = vi.fn(async (name: string) => ({
+      id: "d8d5a9237b2043d8883b1150148d6955",
+      name,
+    }));
+
+    const result = await lookupMinecraftProfilesForImportRows(
+      [
+        { name: "Crown" },
+        { name: "Royal", category: "English Words" },
+      ],
+      { lookup },
+    );
+
+    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(lookup).toHaveBeenCalledWith("Royal");
+    expect([...result.keys()]).toEqual(["royal"]);
   });
 });
