@@ -44,9 +44,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (body.nameOriginal !== undefined) {
       const validation = validateMinecraftUsername(body.nameOriginal);
       if (!validation.valid) return jsonError(validation.reason, 400);
+      const normalized = normalizeUsername(body.nameOriginal);
+      const duplicate = await prisma.candidate.findUnique({ where: { nameNormalized: normalized } });
+      if (duplicate && duplicate.id !== id) return jsonError("Candidate already exists", 409);
       data.nameOriginal = body.nameOriginal.trim();
-      data.nameNormalized = normalizeUsername(body.nameOriginal);
-      data.length = normalizeUsername(body.nameOriginal).length;
+      data.nameNormalized = normalized;
+      data.length = normalized.length;
     }
     if (body.categoryId !== undefined) data.categoryId = body.categoryId;
     if (body.sourceId !== undefined) data.sourceId = body.sourceId;

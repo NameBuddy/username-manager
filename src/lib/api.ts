@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { AuthError } from "@/lib/auth";
 
 export function jsonOk<T>(data: T, init?: ResponseInit) {
@@ -12,6 +13,13 @@ export function jsonError(message: string, status = 400, details?: unknown) {
 export function toApiError(error: unknown) {
   if (error instanceof AuthError) {
     return jsonError("Authentication required", 401);
+  }
+
+  if (error instanceof z.ZodError) {
+    const first = error.issues[0];
+    const path = first?.path.map(String).join(".");
+    const message = first ? (path ? `${path}: ${first.message}` : first.message) : "Invalid request data";
+    return jsonError(message, 400, error.issues);
   }
 
   if (error instanceof Error) {

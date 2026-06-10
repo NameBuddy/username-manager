@@ -9,18 +9,23 @@ export async function POST(request: Request) {
   try {
     const session = await requireAdminApi();
     const { ids } = schema.parse(await readJson(request));
-    const result = await prisma.candidate.updateMany({
+    const existing = await prisma.candidate.findMany({
       where: { id: { in: ids } },
-      data: { candidateStatus: "archived" },
+      select: { id: true },
     });
-    await prisma.candidateEvent.createMany({
-      data: ids.map((candidateId) => ({
-        candidateId,
-        eventType: "archived",
-        createdById: session.userId,
-      })),
-      skipDuplicates: true,
-    });
+    const [result] = await prisma.$transaction([
+      prisma.candidate.updateMany({
+        where: { id: { in: existing.map(({ id }) => id) } },
+        data: { candidateStatus: "archived" },
+      }),
+      prisma.candidateEvent.createMany({
+        data: existing.map(({ id }) => ({
+          candidateId: id,
+          eventType: "archived",
+          createdById: session.userId,
+        })),
+      }),
+    ]);
     return jsonOk({ count: result.count });
   } catch (error) {
     return toApiError(error);
