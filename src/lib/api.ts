@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { AuthError } from "@/lib/auth";
 
@@ -20,6 +21,12 @@ export function toApiError(error: unknown) {
     const path = first?.path.map(String).join(".");
     const message = first ? (path ? `${path}: ${first.message}` : first.message) : "Invalid request data";
     return jsonError(message, 400, error.issues);
+  }
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2002") return jsonError("A record with that unique value already exists", 409);
+    if (error.code === "P2025") return jsonError("Record not found", 404);
+    if (error.code === "P2003") return jsonError("A related record does not exist", 400);
   }
 
   if (error instanceof Error) {

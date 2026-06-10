@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { requireAdminApi } from "@/lib/auth";
-import { jsonOk, readJson, toApiError } from "@/lib/api";
+import { jsonError, jsonOk, readJson, toApiError } from "@/lib/api";
 import { slugify } from "@/lib/names";
 import { prisma } from "@/lib/prisma";
 
@@ -27,8 +27,11 @@ export async function POST(request: Request) {
   try {
     await requireAdminApi();
     const body = schema.parse(await readJson(request));
+    const slug = slugify(body.name);
+    const existing = await prisma.category.findFirst({ where: { OR: [{ name: body.name }, { slug }] } });
+    if (existing) return jsonError("Category already exists", 409);
     const item = await prisma.category.create({
-      data: { ...body, slug: slugify(body.name) },
+      data: { ...body, slug },
       include: { _count: { select: { candidates: true } } },
     });
     return jsonOk({ item }, { status: 201 });
