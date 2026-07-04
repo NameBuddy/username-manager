@@ -3,6 +3,7 @@
 import { FileUp, Play, Upload } from "lucide-react";
 import { ChangeEvent, useEffect, useState } from "react";
 import { type TaxonomyItem } from "@/lib/client-types";
+import { splitList } from "@/lib/client-utils";
 import { getImportPrimaryActionState } from "@/lib/import-ui";
 
 type PreviewRow = {
@@ -44,12 +45,13 @@ type ImportResult = {
   };
 };
 
-function split(value: string) {
-  return value
-    .split(/[,;|]/g)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
+const statusChipClass: Record<PreviewRow["status"], string> = {
+  valid: "chip chip-valid",
+  invalid: "chip chip-invalid",
+  duplicate: "chip chip-duplicate",
+};
+
+const PREVIEW_ROW_LIMIT = 100;
 
 export function ImportManager() {
   const [type, setType] = useState<"txt" | "csv" | "json">("txt");
@@ -80,7 +82,8 @@ export function ImportManager() {
   }, []);
 
   async function readFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+    const input = event.target;
+    const file = input.files?.[0];
     if (!file) return;
     resetImportState();
     setFilename(file.name);
@@ -89,6 +92,7 @@ export function ImportManager() {
     else if (extension === "json") setType("json");
     else setType("txt");
     setContent(await file.text());
+    input.value = "";
   }
 
   function resetImportState() {
@@ -120,7 +124,7 @@ export function ImportManager() {
       },
       defaults: {
         category: category || undefined,
-        labels: split(labels),
+        labels: splitList(labels),
       },
       options: { autoCategorizeMissingCategories },
     };
@@ -302,13 +306,13 @@ export function ImportManager() {
                 </tr>
               </thead>
               <tbody>
-                {preview.rows.slice(0, 100).map((row) => (
+                {preview.rows.slice(0, PREVIEW_ROW_LIMIT).map((row) => (
                   <tr key={row.rowNumber} className="border-t border-zinc-100">
                     <td className="p-3">{row.rowNumber}</td>
                     <td className="p-3 font-medium">{row.nameOriginal}</td>
                     <td className="p-3">{row.nameNormalized}</td>
                     <td className="p-3">{row.category ?? "-"}</td>
-                    <td className="p-3"><span className="chip">{row.status}</span></td>
+                    <td className="p-3"><span className={statusChipClass[row.status]}>{row.status}</span></td>
                     <td className="p-3">{row.reason ?? "-"}</td>
                     <td className="p-3">{row.fuzzyDuplicateNames.join(", ") || "-"}</td>
                     <td className="p-3">{row.labels.join(", ")}</td>
@@ -317,6 +321,11 @@ export function ImportManager() {
               </tbody>
             </table>
           </div>
+          {preview.rows.length > PREVIEW_ROW_LIMIT ? (
+            <p className="mt-3 text-sm text-zinc-500">
+              Showing the first {PREVIEW_ROW_LIMIT} of {preview.rows.length.toLocaleString()} rows. All rows are included in the import.
+            </p>
+          ) : null}
         </section>
       ) : null}
 

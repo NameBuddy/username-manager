@@ -1,16 +1,7 @@
 import Link from "next/link";
-import { BarChart3, Download, FolderTree, History, Import, UsersRound } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
+import { AdminNav } from "@/components/admin-nav";
 import { LogoutButton } from "@/components/logout-button";
-
-const nav = [
-  { href: "/admin", label: "Dashboard", icon: BarChart3 },
-  { href: "/admin/candidates", label: "Candidates", icon: UsersRound },
-  { href: "/admin/import", label: "Import", icon: Import },
-  { href: "/admin/export", label: "Export", icon: Download },
-  { href: "/admin/categories", label: "Categories", icon: FolderTree },
-  { href: "/admin/imports", label: "Import History", icon: History },
-];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   await requireAdmin();
@@ -22,21 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <div className="text-xl font-bold tracking-tight">NameDB</div>
           <div className="text-xs text-zinc-500">Private admin</div>
         </Link>
-        <nav className="grid gap-1">
-          {nav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950"
-              >
-                <Icon size={16} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <AdminNav />
         <div className="mt-auto">
           <LogoutButton />
         </div>

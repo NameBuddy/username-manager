@@ -24,6 +24,7 @@ export function ImportsManager() {
   }
 
   async function rollback(id: string) {
+    if (!window.confirm("Roll back this import? Candidates created by this batch will be deleted.")) return;
     const response = await fetch(`/api/imports/${id}/rollback`, { method: "POST" });
     const body = (await response.json().catch(() => null)) as { deletedCandidates?: number; error?: string } | null;
     setMessage(response.ok ? `Rolled back ${body?.deletedCandidates ?? 0} candidates` : body?.error ?? "Rollback failed");

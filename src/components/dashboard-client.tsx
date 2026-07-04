@@ -26,12 +26,8 @@ export function DashboardClient() {
 
   async function load() {
     const [dashboardResponse, categoryResponse] = await Promise.all([fetch("/api/dashboard"), fetch("/api/categories")]);
-    setData(await fetchDashboardJson(dashboardResponse));
+    setData((await dashboardResponse.json()) as DashboardData);
     setCategories(((await categoryResponse.json()) as { items: TaxonomyItem[] }).items ?? []);
-  }
-
-  async function fetchDashboardJson(response: Response) {
-    return (await response.json()) as DashboardData;
   }
 
   useEffect(() => {

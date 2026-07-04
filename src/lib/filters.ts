@@ -25,23 +25,35 @@ export function candidateDetailInclude() {
   };
 }
 
+function toFiniteNumber(value: string | null): number | null {
+  if (value === null || value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toValidDate(value: string | null): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function dateRange(params: URLSearchParams, fromKey: string, toKey: string) {
-  const from = params.get(fromKey);
-  const to = params.get(toKey);
+  const from = toValidDate(params.get(fromKey));
+  const to = toValidDate(params.get(toKey));
   const range: Prisma.DateTimeNullableFilter = {};
 
-  if (from) range.gte = new Date(from);
-  if (to) range.lte = new Date(to);
+  if (from) range.gte = from;
+  if (to) range.lte = to;
   return Object.keys(range).length ? range : undefined;
 }
 
 function intRange(params: URLSearchParams, minKey: string, maxKey: string) {
-  const min = params.get(minKey);
-  const max = params.get(maxKey);
+  const min = toFiniteNumber(params.get(minKey));
+  const max = toFiniteNumber(params.get(maxKey));
   const range: Prisma.IntNullableFilter = {};
 
-  if (min !== null && min !== "") range.gte = Number(min);
-  if (max !== null && max !== "") range.lte = Number(max);
+  if (min !== null) range.gte = min;
+  if (max !== null) range.lte = max;
   return Object.keys(range).length ? range : undefined;
 }
 
@@ -74,13 +86,16 @@ export function candidateWhereFromParams(params: URLSearchParams): Prisma.Candid
   if (availabilityStatus) where.availabilityStatus = availabilityStatus;
   if (source) where.source = { name: { contains: source, mode: "insensitive" } };
   if (tagId) where.tags = { some: { tagId } };
-  if (labelId) where.labels = { some: { labelId } };
   if (lengthRange) where.length = lengthRange;
   if (createdRange) where.createdAt = createdRange;
   if (lastCheckedRange) where.lastCheckedAt = lastCheckedRange;
+
+  const labelConditions: Prisma.CandidateWhereInput[] = [];
+  if (labelId) labelConditions.push({ labels: { some: { labelId } } });
   if (duplicateStatus === "warning") {
-    where.labels = { some: { label: { slug: "duplicate-warning" } } };
+    labelConditions.push({ labels: { some: { label: { slug: "duplicate-warning" } } } });
   }
+  if (labelConditions.length) where.AND = labelConditions;
 
   return where;
 }
@@ -103,7 +118,7 @@ export function candidateOrderByFromParams(params: URLSearchParams): Prisma.Cand
 }
 
 export function paginationFromParams(params: URLSearchParams) {
-  const page = Math.max(1, Number(params.get("page") ?? 1));
-  const pageSize = Math.min(200, Math.max(10, Number(params.get("pageSize") ?? 50)));
+  const page = Math.max(1, Math.trunc(toFiniteNumber(params.get("page")) ?? 1));
+  const pageSize = Math.min(200, Math.max(10, Math.trunc(toFiniteNumber(params.get("pageSize")) ?? 50)));
   return { page, pageSize, skip: (page - 1) * pageSize, take: pageSize };
 }

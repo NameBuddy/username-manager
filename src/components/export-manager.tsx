@@ -3,6 +3,7 @@
 import { Download, Save } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import { sortOptions, type TaxonomyItem } from "@/lib/client-types";
+import { downloadBlob } from "@/lib/client-utils";
 
 const blankFilters = {
   search: "",
@@ -21,15 +22,15 @@ const blankFilters = {
 type Filters = typeof blankFilters;
 type Preset = { name: string; filters: Filters; format: "txt" | "csv" | "json" };
 
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+const PRESETS_STORAGE_KEY = "namedb-export-presets";
+
+function loadStoredPresets(): Preset[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY) ?? "[]") as unknown;
+    return Array.isArray(parsed) ? (parsed as Preset[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 export function ExportManager() {
@@ -41,6 +42,7 @@ export function ExportManager() {
   const [presets, setPresets] = useState<Preset[]>([]);
   const [presetName, setPresetName] = useState("Custom Export");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     Promise.all([fetch("/api/categories"), fetch("/api/labels")]).then(
@@ -49,7 +51,7 @@ export function ExportManager() {
         setLabels(((await labelResponse.json()) as { items: TaxonomyItem[] }).items ?? []);
       },
     );
-    setPresets(JSON.parse(localStorage.getItem("namedb-export-presets") ?? "[]") as Preset[]);
+    setPresets(loadStoredPresets());
   }, []);
 
   useEffect(() => {
@@ -66,20 +68,31 @@ export function ExportManager() {
 
   async function exportFile() {
     setBusy(true);
-    const response = await fetch("/api/export", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ format, filters }),
-    });
-    downloadBlob(await response.blob(), `namedb-export.${format}`);
-    setBusy(false);
+    setError("");
+    try {
+      const response = await fetch("/api/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format, filters }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        setError(body?.error ?? "Export failed");
+        return;
+      }
+      downloadBlob(await response.blob(), `namedb-export.${format}`);
+    } catch {
+      setError("Export failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function savePreset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const next = [...presets.filter((preset) => preset.name !== presetName), { name: presetName, filters, format }];
     setPresets(next);
-    localStorage.setItem("namedb-export-presets", JSON.stringify(next));
+    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(next));
   }
 
   function applyPreset(preset: Preset) {
@@ -127,6 +140,7 @@ export function ExportManager() {
           <h2 className="text-lg font-semibold">Preview Count</h2>
           <div className="mt-3 text-4xl font-semibold">{count.toLocaleString()}</div>
           <p className="mt-1 text-sm text-zinc-600">Candidates match these filters.</p>
+          {error ? <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
           <button className="btn mt-5 w-full" type="button" disabled={busy} onClick={() => void exportFile()}>
             <Download size={16} />
             Export {format.toUpperCase()}

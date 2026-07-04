@@ -1,8 +1,9 @@
 "use client";
 
 import { Archive, Download, Edit3, Plus, RefreshCw, Save, Search } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { sortOptions, type CandidateItem, type TaxonomyItem } from "@/lib/client-types";
+import { downloadBlob, splitList } from "@/lib/client-utils";
 
 type CandidateListResponse = {
   items: CandidateItem[];
@@ -46,23 +47,7 @@ function candidateToForm(candidate: CandidateItem): CandidateForm {
   };
 }
 
-function splitLabels(value: string) {
-  return value
-    .split(/[,;|]/g)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
+const FILTER_DEBOUNCE_MS = 300;
 
 export function CandidatesManager() {
   const [filters, setFilters] = useState(initialFilters);
@@ -73,8 +58,10 @@ export function CandidatesManager() {
   const [active, setActive] = useState<CandidateItem | null>(null);
   const [form, setForm] = useState<CandidateForm>(emptyForm);
   const [message, setMessage] = useState("");
+  const [tableMessage, setTableMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const selectedIds = useMemo(() => [...selected], [selected]);
+  const loadRequestRef = useRef(0);
 
   async function loadTaxonomy() {
     const [categoryResponse, labelResponse] = await Promise.all([fetch("/api/categories"), fetch("/api/labels")]);
@@ -83,14 +70,30 @@ export function CandidatesManager() {
   }
 
   async function loadCandidates(page = list.page) {
+    const requestId = ++loadRequestRef.current;
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(filters)) {
       if (value) params.set(key, value);
     }
     params.set("page", String(page));
     params.set("pageSize", String(list.pageSize));
-    const response = await fetch(`/api/candidates?${params.toString()}`);
-    setList((await response.json()) as CandidateListResponse);
+
+    try {
+      const response = await fetch(`/api/candidates?${params.toString()}`);
+      if (!response.ok) throw new Error("Request failed");
+      const body = (await response.json()) as CandidateListResponse;
+      if (requestId !== loadRequestRef.current) return;
+      if (body.total > 0 && body.items.length === 0 && body.page > body.totalPages) {
+        await loadCandidates(body.totalPages);
+        return;
+      }
+      setList(body);
+      setTableMessage("");
+    } catch {
+      if (requestId === loadRequestRef.current) {
+        setTableMessage("Could not load candidates. Try refreshing.");
+      }
+    }
   }
 
   useEffect(() => {
@@ -98,7 +101,8 @@ export function CandidatesManager() {
   }, []);
 
   useEffect(() => {
-    void loadCandidates(1);
+    const timeout = setTimeout(() => void loadCandidates(1), FILTER_DEBOUNCE_MS);
+    return () => clearTimeout(timeout);
   }, [filters]);
 
   async function selectCandidate(candidate: CandidateItem) {
@@ -131,7 +135,7 @@ export function CandidatesManager() {
     const payload = {
       nameOriginal: form.nameOriginal,
       categoryId: form.categoryId || null,
-      labels: splitLabels(form.labels),
+      labels: splitList(form.labels),
       autoCategorize: form.autoCategorize,
     };
     const response = await fetch(active ? `/api/candidates/${active.id}` : "/api/candidates", {
@@ -153,18 +157,28 @@ export function CandidatesManager() {
 
   async function archiveActive() {
     if (!active) return;
-    await fetch(`/api/candidates/${active.id}`, { method: "DELETE" });
+    if (!window.confirm(`Archive "${active.nameOriginal}"?`)) return;
+    const response = await fetch(`/api/candidates/${active.id}`, { method: "DELETE" });
+    if (!response.ok) {
+      setMessage("Archive failed");
+      return;
+    }
     resetForm();
     await loadCandidates();
   }
 
   async function bulkArchive() {
     if (!selectedIds.length) return;
-    await fetch("/api/candidates/bulk-delete", {
+    if (!window.confirm(`Archive ${selectedIds.length} selected candidate${selectedIds.length === 1 ? "" : "s"}?`)) return;
+    const response = await fetch("/api/candidates/bulk-delete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids: selectedIds }),
     });
+    if (!response.ok) {
+      setTableMessage("Bulk archive failed");
+      return;
+    }
     setSelected(new Set());
     await loadCandidates();
   }
@@ -175,6 +189,10 @@ export function CandidatesManager() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ format, ids: selectedIds }),
     });
+    if (!response.ok) {
+      setTableMessage("Export failed");
+      return;
+    }
     downloadBlob(await response.blob(), `selected-candidates.${format}`);
   }
 
@@ -197,7 +215,12 @@ export function CandidatesManager() {
             Search
             <div className="relative">
               <Search className="pointer-events-none absolute left-2 top-2.5 text-zinc-400" size={16} />
-              <input className="field pl-8" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} />
+              <input
+                className="field pl-8"
+                placeholder="Search names or notes"
+                value={filters.search}
+                onChange={(event) => setFilters({ ...filters, search: event.target.value })}
+              />
             </div>
           </label>
           <FilterSelect label="Category" value={filters.categoryId} items={categories} onChange={(value) => setFilters({ ...filters, categoryId: value })} />
@@ -239,6 +262,9 @@ export function CandidatesManager() {
               </button>
             </div>
           </div>
+          {tableMessage ? (
+            <p className="border-b border-zinc-200 bg-red-50 px-3 py-2 text-sm text-red-700">{tableMessage}</p>
+          ) : null}
           <div className="scrollbar-thin overflow-auto">
             <table className="w-full min-w-[760px] border-collapse text-left text-sm">
               <thead className="table-head">
@@ -258,6 +284,13 @@ export function CandidatesManager() {
                 </tr>
               </thead>
               <tbody>
+                {!list.items.length ? (
+                  <tr className="border-t border-zinc-100">
+                    <td className="p-6 text-center text-sm text-zinc-500" colSpan={6}>
+                      No candidates match the current filters.
+                    </td>
+                  </tr>
+                ) : null}
                 {list.items.map((candidate) => (
                   <tr key={candidate.id} className="border-t border-zinc-100 hover:bg-white">
                     <td className="p-3">

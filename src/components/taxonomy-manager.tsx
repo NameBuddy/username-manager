@@ -8,6 +8,12 @@ type Kind = "categories" | "tags" | "labels";
 
 const empty = { name: "", description: "", color: "#2563eb" };
 
+const singularByKind: Record<Kind, string> = {
+  categories: "category",
+  tags: "tag",
+  labels: "label",
+};
+
 export function TaxonomyManager({ kind, title }: { kind: Kind; title: string }) {
   const [items, setItems] = useState<TaxonomyItem[]>([]);
   const [active, setActive] = useState<TaxonomyItem | null>(null);
@@ -47,7 +53,22 @@ export function TaxonomyManager({ kind, title }: { kind: Kind; title: string }) 
   }
 
   async function remove(item: TaxonomyItem) {
-    await fetch(`/api/${kind}/${item.id}`, { method: "DELETE" });
+    const singular = singularByKind[kind];
+    const count = item._count?.candidates ?? 0;
+    const impact = count ? ` ${count.toLocaleString()} candidate${count === 1 ? "" : "s"} will lose this ${singular}.` : "";
+    if (!window.confirm(`Delete ${singular} "${item.name}"?${impact}`)) return;
+
+    const response = await fetch(`/api/${kind}/${item.id}`, { method: "DELETE" });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      setMessage(body?.error ?? "Delete failed");
+      return;
+    }
+    if (active?.id === item.id) {
+      setActive(null);
+      setForm(empty);
+    }
+    setMessage(`Deleted "${item.name}"`);
     await load();
   }
 
@@ -58,7 +79,8 @@ export function TaxonomyManager({ kind, title }: { kind: Kind; title: string }) 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sourceId, targetId }),
     });
-    setMessage(response.ok ? "Merged" : "Merge failed");
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    setMessage(response.ok ? "Merged" : body?.error ?? "Merge failed");
     setSourceId("");
     setTargetId("");
     await load();
@@ -84,6 +106,13 @@ export function TaxonomyManager({ kind, title }: { kind: Kind; title: string }) 
               </tr>
             </thead>
             <tbody>
+              {!items.length ? (
+                <tr className="border-t border-zinc-100">
+                  <td className="p-6 text-center text-sm text-zinc-500" colSpan={5}>
+                    Nothing here yet. Create one with the form on the right.
+                  </td>
+                </tr>
+              ) : null}
               {items.map((item) => (
                 <tr key={item.id} className="border-t border-zinc-100">
                   <td className="p-3">
